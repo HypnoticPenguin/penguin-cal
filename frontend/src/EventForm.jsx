@@ -55,6 +55,12 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
   }
 
   const applyDurationPreset = (minutes) => {
+    if (minutes === 'ALL_DAY') {
+      setStartTime('')
+      setEndTime('')
+      return
+    }
+
     const start = startTime || '09:00'
     if (!startTime) setStartTime('09:00')
 
@@ -202,14 +208,15 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
         </select>
       </div>
 
-      {/* Duration Quick Presets */}
+      {/* Duration Quick Presets including All Day */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
         <span style={{ fontWeight: 'bold', color: theme.subText }}>Duration presets:</span>
         {[
-          { label: '30m', mins: 30 },
-          { label: '1 hr', mins: 60 },
-          { label: '2 hrs', mins: 120 },
-          { label: '4 hrs', mins: 240 }
+          { label: 'All Day', mins: 'ALL_DAY' },
+          { label: '+30m', mins: 30 },
+          { label: '+1 hr', mins: 60 },
+          { label: '+2 hrs', mins: 120 },
+          { label: '+4 hrs', mins: 240 }
         ].map((p) => (
           <button
             type="button"
@@ -225,7 +232,7 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
               fontSize: '0.8rem'
             }}
           >
-            +{p.label}
+            {p.label}
           </button>
         ))}
       </div>
