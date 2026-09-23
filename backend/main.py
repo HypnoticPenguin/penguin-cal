@@ -30,6 +30,7 @@ def get_session():
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(unique=True, index=True)
+    display_name: Optional[str] = Field(default=None)
     hashed_password: str
     is_admin: bool = Field(default=False)
 
@@ -54,22 +55,28 @@ class Event(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     title: str
     date: str
-    start_time: Optional[str] = None  # Format: "HH:MM"
-    end_time: Optional[str] = None    # Format: "HH:MM"
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
     rrule: Optional[str] = None
     exdates: Optional[str] = None
 
 # ------------------------------------------------------------------
 # 3. Schemas
 # ------------------------------------------------------------------
+
 class UserRegister(BaseModel):
     username: str
+    display_name: Optional[str] = None
     password: str
 
 class UserResponse(BaseModel):
     id: int
     username: str
+    display_name: Optional[str] = None
     is_admin: bool
+
+class ProfileUpdate(BaseModel):
+    display_name: str
 
 class CalendarCreate(BaseModel):
     name: str
@@ -174,8 +181,9 @@ def health_check():
     return {"status": "ok", "message": "Backend running!"}
 
 # ------------------------------------------------------------------
-# 6. Auth Routes
+# 6. Auth & Profile Routes
 # ------------------------------------------------------------------
+
 @app.post("/api/auth/register", response_model=TokenResponse)
 def register_user(user_data: UserRegister, session: Session = Depends(get_session)):
     existing = session.exec(select(User).where(User.username == user_data.username)).first()
@@ -185,8 +193,12 @@ def register_user(user_data: UserRegister, session: Session = Depends(get_sessio
     user_count = len(session.exec(select(User)).all())
     is_first_user = (user_count == 0)
     
+    # Use provided display_name or fallback to username if blank
+    d_name = user_data.display_name.strip() if user_data.display_name else user_data.username
+    
     new_user = User(
         username=user_data.username,
+        display_name=d_name,
         hashed_password=hash_password(user_data.password),
         is_admin=is_first_user
     )
@@ -221,6 +233,29 @@ def get_me(current_user: User = Depends(get_current_user)):
     return {
         "id": current_user.id,
         "username": current_user.username,
+        "display_name": current_user.display_name or current_user.username,
+        "is_admin": current_user.is_admin
+    }
+
+@app.put("/api/auth/profile", response_model=UserResponse)
+def update_profile(
+    profile_data: ProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    clean_name = profile_data.display_name.strip()
+    if not clean_name:
+        raise HTTPException(status_code=400, detail="Display name cannot be empty")
+    
+    current_user.display_name = clean_name
+    session.add(current_user)
+    session.commit()
+    session.refresh(current_user)
+    
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "display_name": current_user.display_name,
         "is_admin": current_user.is_admin
     }
 
@@ -270,7 +305,7 @@ def get_user_calendars(
         })
     for c in shared:
         owner = session.get(User, c.owner_id)
-        owner_name = owner.username if owner else "Unknown"
+        owner_name = (owner.display_name or owner.username) if owner else "Unknown"
         output.append({
             "id": c.id,
             "name": f"{c.name} ({owner_name})",
@@ -327,7 +362,12 @@ def get_calendar_shares(
     shared_user_ids = {s.shared_with_user_id for s in existing_shares}
     
     return [
-        {"user_id": u.id, "username": u.username, "has_access": u.id in shared_user_ids}
+        {
+            "user_id": u.id,
+            "username": u.username,
+            "display_name": u.display_name or u.username,
+            "has_access": u.id in shared_user_ids
+        }
         for u in all_users
     ]
 
@@ -548,7 +588,15 @@ def list_users(
     session: Session = Depends(get_session)
 ):
     users = session.exec(select(User)).all()
-    return [{"id": u.id, "username": u.username, "is_admin": u.is_admin} for u in users]
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "display_name": u.display_name or u.username,
+            "is_admin": u.is_admin
+        }
+        for u in users
+    ]
 
 @app.delete("/api/admin/users/{user_id}")
 def delete_user(

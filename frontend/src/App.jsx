@@ -172,10 +172,9 @@ export default function App() {
             />
             <h1 style={{ margin: 0 }}>Penguin Cal</h1>
           </div>
-
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <span>
-              Logged in as: <strong>{currentUser?.username}</strong>
+              Logged in as: <strong>{currentUser?.display_name || currentUser?.username}</strong>
               {currentUser?.is_admin && (
                 <span style={{ marginLeft: '0.5rem', color: '#e65100', fontWeight: 'bold' }}>(Admin)</span>
               )}
@@ -210,7 +209,6 @@ export default function App() {
         <EventForm calendars={calendars} theme={currentTheme} onEventAdded={fetchEvents} defaultDate={selectedDate} />
 
         <h2>Calendar Grid</h2>
-
         <CalendarView
           events={visibleEvents}
           themeColors={currentTheme}
@@ -270,6 +268,7 @@ export default function App() {
           currentTheme={themeKey}
           themeColors={currentTheme}
           onThemeChange={handleThemeChange}
+          onUserUpdated={fetchUser}
         />
       </div>
 

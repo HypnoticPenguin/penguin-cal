@@ -3,6 +3,7 @@ import { useState } from 'react'
 export default function AuthForm({ onAuthSuccess, theme }) {
   const [isLogin, setIsLogin] = useState(true)
   const [username, setUsername] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -20,16 +21,14 @@ export default function AuthForm({ onAuthSuccess, theme }) {
     e.preventDefault()
     setError('')
     setLoading(true)
-
     const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register'
-
+    
     try {
       let response
       if (isLogin) {
         const formData = new URLSearchParams()
         formData.append('username', username)
         formData.append('password', password)
-
         response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -39,7 +38,11 @@ export default function AuthForm({ onAuthSuccess, theme }) {
         response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password }),
+          body: JSON.stringify({ 
+            username, 
+            display_name: displayName || username, 
+            password 
+          }),
         })
       }
 
@@ -103,7 +106,6 @@ export default function AuthForm({ onAuthSuccess, theme }) {
           transition: 'all 0.3s ease'
         }}
       >
-        {/* LOGO AND TITLE HEADER */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
           <img
             src="/penguin-logo.svg"
@@ -145,6 +147,21 @@ export default function AuthForm({ onAuthSuccess, theme }) {
               style={inputStyle}
             />
           </div>
+
+          {!isLogin && (
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '0.3rem', color: activeTheme.text }}>
+                Display Name (Optional)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Jane Doe"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                style={inputStyle}
+              />
+            </div>
+          )}
 
           <div>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '0.3rem', color: activeTheme.text }}>

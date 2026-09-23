@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { apiFetch } from './api.js'
 import { themeList } from './themes.js'
 import AdminPanel from './AdminPanel.jsx'
@@ -9,24 +9,51 @@ export default function UserSettingsModal({
   currentUser,
   currentTheme,
   themeColors,
-  onThemeChange
+  onThemeChange,
+  onUserUpdated
 }) {
+  const [displayName, setDisplayName] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [msg, setMsg] = useState({ text: '', isError: false })
+  const [profileMsg, setProfileMsg] = useState({ text: '', isError: false })
+  const [passMsg, setPassMsg] = useState({ text: '', isError: false })
+
+  useEffect(() => {
+    if (currentUser) {
+      setDisplayName(currentUser.display_name || currentUser.username || '')
+    }
+  }, [currentUser])
 
   if (!isOpen) return null
 
+  const handleProfileSubmit = async (e) => {
+    e.preventDefault()
+    setProfileMsg({ text: '', isError: false })
+    try {
+      const res = await apiFetch('/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ display_name: displayName })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setProfileMsg({ text: 'Display name updated successfully!', isError: false })
+        if (onUserUpdated) onUserUpdated()
+      } else {
+        setProfileMsg({ text: data.detail || 'Failed to update display name', isError: true })
+      }
+    } catch (err) {
+      setProfileMsg({ text: 'Error updating display name', isError: true })
+    }
+  }
+
   const handlePasswordSubmit = async (e) => {
     e.preventDefault()
-    setMsg({ text: '', isError: false })
-
+    setPassMsg({ text: '', isError: false })
     if (newPassword !== confirmPassword) {
-      setMsg({ text: 'New passwords do not match.', isError: true })
+      setPassMsg({ text: 'New passwords do not match.', isError: true })
       return
     }
-
     try {
       const res = await apiFetch('/auth/change-password', {
         method: 'PUT',
@@ -35,19 +62,17 @@ export default function UserSettingsModal({
           new_password: newPassword
         })
       })
-
       const data = await res.json()
-
       if (res.ok) {
-        setMsg({ text: 'Password updated successfully!', isError: false })
+        setPassMsg({ text: 'Password updated successfully!', isError: false })
         setCurrentPassword('')
         setNewPassword('')
         setConfirmPassword('')
       } else {
-        setMsg({ text: data.detail || 'Failed to update password', isError: true })
+        setPassMsg({ text: data.detail || 'Failed to update password', isError: true })
       }
     } catch (err) {
-      setMsg({ text: 'Error updating password', isError: true })
+      setPassMsg({ text: 'Error updating password', isError: true })
     }
   }
 
@@ -92,14 +117,40 @@ export default function UserSettingsModal({
       >
         <h2 style={{ marginTop: 0, marginBottom: '1.25rem' }}>Account & App Settings</h2>
 
-        {/* 1. Admin Management Panel (Admin Only) */}
+        {/* Admin Management Panel */}
         {currentUser?.is_admin && (
           <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
             <AdminPanel currentUserId={currentUser.id} theme={themeColors} />
           </div>
         )}
 
-        {/* 2. Theme Selection */}
+        {/* Profile Settings (Display Name) */}
+        <form onSubmit={handleProfileSubmit} style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
+          <h3 style={{ margin: '0 0 0.75rem 0' }}>Profile</h3>
+          {profileMsg.text && (
+            <p style={{ color: profileMsg.isError ? '#ff5252' : '#66bb6a', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
+              {profileMsg.text}
+            </p>
+          )}
+          <div style={{ marginBottom: '0.75rem' }}>
+            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Display Name</label>
+            <input
+              type="text"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              required
+              style={inputStyle}
+            />
+          </div>
+          <button
+            type="submit"
+            style={{ padding: '0.4rem 0.8rem', background: themeColors.primary, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+          >
+            Save Profile
+          </button>
+        </form>
+
+        {/* Theme Selection */}
         <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
           <h3 style={{ margin: '0 0 0.75rem 0' }}>Appearance</h3>
           <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Calendar Theme</label>
@@ -116,16 +167,14 @@ export default function UserSettingsModal({
           </select>
         </div>
 
-        {/* 3. Password Reset Form */}
+        {/* Password Reset Form */}
         <form onSubmit={handlePasswordSubmit}>
           <h3 style={{ margin: '0 0 0.75rem 0' }}>Change Password</h3>
-
-          {msg.text && (
-            <p style={{ color: msg.isError ? '#ff5252' : '#66bb6a', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
-              {msg.text}
+          {passMsg.text && (
+            <p style={{ color: passMsg.isError ? '#ff5252' : '#66bb6a', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
+              {passMsg.text}
             </p>
           )}
-
           <div style={{ marginBottom: '0.75rem' }}>
             <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Current Password</label>
             <input
@@ -136,7 +185,6 @@ export default function UserSettingsModal({
               style={inputStyle}
             />
           </div>
-
           <div style={{ marginBottom: '0.75rem' }}>
             <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>New Password</label>
             <input
@@ -147,7 +195,6 @@ export default function UserSettingsModal({
               style={inputStyle}
             />
           </div>
-
           <div style={{ marginBottom: '1.25rem' }}>
             <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Confirm New Password</label>
             <input
@@ -158,7 +205,6 @@ export default function UserSettingsModal({
               style={inputStyle}
             />
           </div>
-
           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
             <button
               type="button"

@@ -17,13 +17,11 @@ export default function CalendarManager({
   const handleCreateCalendar = async (e) => {
     e.preventDefault()
     if (!newCalName) return
-
     try {
       const res = await apiFetch('/calendars', {
         method: 'POST',
         body: JSON.stringify({ name: newCalName, color: '#2196F3' })
       })
-
       if (res.ok) {
         setNewCalName('')
         onCalendarCreated()
@@ -64,7 +62,6 @@ export default function CalendarManager({
         method: 'PUT',
         body: JSON.stringify({ name: editName, color: editColor })
       })
-
       if (res.ok) {
         onCalendarCreated()
       }
@@ -75,20 +72,17 @@ export default function CalendarManager({
 
   const handleCheckboxToggle = async (calId, userId, currentAccess) => {
     const newAccessStatus = !currentAccess
-
     setSharesMap((prev) => ({
       ...prev,
       [calId]: (prev[calId] || []).map((u) =>
         u.user_id === userId ? { ...u, has_access: newAccessStatus } : u
       )
     }))
-
     try {
       const res = await apiFetch(`/calendars/${calId}/shares/toggle`, {
         method: 'POST',
         body: JSON.stringify({ user_id: userId, has_access: newAccessStatus })
       })
-
       if (!res.ok) {
         fetchShares(calId)
       }
@@ -111,7 +105,6 @@ export default function CalendarManager({
       }}
     >
       <h3 style={{ marginTop: 0 }}>My Calendars</h3>
-
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
         {calendars.map((cal) => (
           <div
@@ -135,7 +128,6 @@ export default function CalendarManager({
                 />
                 {cal.name}
               </label>
-
               {cal.is_owner ? (
                 <button
                   type="button"
@@ -156,7 +148,6 @@ export default function CalendarManager({
                 <span style={{ fontSize: '0.75rem', color: theme.subText, fontStyle: 'italic' }}>Shared with you</span>
               )}
             </div>
-
             {cal.is_owner && expandedCalId === cal.id && (
               <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: `1px solid ${theme.border}` }}>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: cal.is_default ? 0 : '1rem' }}>
@@ -167,7 +158,6 @@ export default function CalendarManager({
                     onChange={(e) => setEditName(e.target.value)}
                     style={{ padding: '0.3rem', fontSize: '0.85rem', flexGrow: 1, background: theme.cardBg, color: theme.text, border: `1px solid ${theme.border}` }}
                   />
-
                   <span style={{ fontSize: '0.85rem', fontWeight: 'bold', marginLeft: '0.5rem' }}>Color:</span>
                   <input
                     type="color"
@@ -175,7 +165,6 @@ export default function CalendarManager({
                     onChange={(e) => setEditColor(e.target.value)}
                     style={{ height: '30px', width: '36px', border: 'none', cursor: 'pointer', background: 'transparent' }}
                   />
-
                   <button
                     type="button"
                     onClick={() => handleSaveCalendarSettings(cal.id)}
@@ -193,7 +182,6 @@ export default function CalendarManager({
                     Save Settings
                   </button>
                 </div>
-
                 {cal.is_default ? (
                   <p style={{ fontSize: '0.8rem', color: theme.subText, fontStyle: 'italic', margin: '0.5rem 0 0 0' }}>
                     Note: Your default personal calendar is private and cannot be shared with other users.
@@ -203,7 +191,6 @@ export default function CalendarManager({
                     <span style={{ fontSize: '0.85rem', fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>
                       Shared Access:
                     </span>
-
                     {sharesMap[cal.id] && sharesMap[cal.id].length > 0 ? (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
                         {sharesMap[cal.id].map((u) => (
@@ -226,7 +213,7 @@ export default function CalendarManager({
                               checked={u.has_access}
                               onChange={() => handleCheckboxToggle(cal.id, u.user_id, u.has_access)}
                             />
-                            {u.username}
+                            {u.display_name}
                           </label>
                         ))}
                       </div>
@@ -240,7 +227,6 @@ export default function CalendarManager({
           </div>
         ))}
       </div>
-
       <form onSubmit={handleCreateCalendar} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
         <input
           type="text"
