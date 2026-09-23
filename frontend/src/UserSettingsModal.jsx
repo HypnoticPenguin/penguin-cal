@@ -10,7 +10,8 @@ export default function UserSettingsModal({
   currentTheme,
   themeColors,
   onThemeChange,
-  onUserUpdated
+  onUserUpdated,
+  onEventsChanged
 }) {
   const [displayName, setDisplayName] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
@@ -18,6 +19,8 @@ export default function UserSettingsModal({
   const [confirmPassword, setConfirmPassword] = useState('')
   const [profileMsg, setProfileMsg] = useState({ text: '', isError: false })
   const [passMsg, setPassMsg] = useState({ text: '', isError: false })
+  const [cleanupMsg, setCleanupMsg] = useState({ text: '', isError: false })
+  const [isCleaning, setIsCleaning] = useState(false)
 
   useEffect(() => {
     if (currentUser) {
@@ -76,6 +79,30 @@ export default function UserSettingsModal({
     }
   }
 
+  const handleCleanupPastEvents = async () => {
+    if (!window.confirm("Are you sure you want to delete all past non-recurring events? This cannot be undone.")) {
+      return
+    }
+    setIsCleaning(true)
+    setCleanupMsg({ text: '', isError: false })
+    try {
+      const res = await apiFetch('/events/cleanup-past', {
+        method: 'DELETE'
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setCleanupMsg({ text: data.message, isError: false })
+        if (onEventsChanged) onEventsChanged()
+      } else {
+        setCleanupMsg({ text: data.detail || 'Failed to clean up past events', isError: true })
+      }
+    } catch (err) {
+      setCleanupMsg({ text: 'Error executing cleanup request', isError: true })
+    } finally {
+      setIsCleaning(false)
+    }
+  }
+
   const inputStyle = {
     width: '100%',
     padding: '0.5rem',
@@ -117,14 +144,12 @@ export default function UserSettingsModal({
       >
         <h2 style={{ marginTop: 0, marginBottom: '1.25rem' }}>Account & App Settings</h2>
 
-        {/* Admin Management Panel */}
         {currentUser?.is_admin && (
           <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
             <AdminPanel currentUserId={currentUser.id} theme={themeColors} />
           </div>
         )}
 
-        {/* Profile Settings (Display Name) */}
         <form onSubmit={handleProfileSubmit} style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
           <h3 style={{ margin: '0 0 0.75rem 0' }}>Profile</h3>
           {profileMsg.text && (
@@ -150,7 +175,6 @@ export default function UserSettingsModal({
           </button>
         </form>
 
-        {/* Theme Selection */}
         <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
           <h3 style={{ margin: '0 0 0.75rem 0' }}>Appearance</h3>
           <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Calendar Theme</label>
@@ -167,7 +191,27 @@ export default function UserSettingsModal({
           </select>
         </div>
 
-        {/* Password Reset Form */}
+        {/* Data Management / Cleanup Section */}
+        <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
+          <h3 style={{ margin: '0 0 0.75rem 0' }}>Data Management</h3>
+          <p style={{ fontSize: '0.85rem', color: themeColors.subText, marginBottom: '0.75rem' }}>
+            Remove old one-off events that occurred before today. Recurring events and future entries are safe.
+          </p>
+          {cleanupMsg.text && (
+            <p style={{ color: cleanupMsg.isError ? '#ff5252' : '#66bb6a', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
+              {cleanupMsg.text}
+            </p>
+          )}
+          <button
+            type="button"
+            disabled={isCleaning}
+            onClick={handlePassCleanup => handleCleanupPastEvents()}
+            style={{ padding: '0.5rem 1rem', background: '#d32f2f', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+          >
+            {isCleaning ? 'Cleaning...' : 'Clear Past Events'}
+          </button>
+        </div>
+
         <form onSubmit={handlePasswordSubmit}>
           <h3 style={{ margin: '0 0 0.75rem 0' }}>Change Password</h3>
           {passMsg.text && (

@@ -2,13 +2,14 @@ import os
 from datetime import datetime, timedelta
 from typing import Optional, List
 from dateutil import rrule
-from fastapi import FastAPI, HTTPException, Depends, Query, status
+from fastapi import FastAPI, HTTPException, Depends, Query, status, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlmodel import SQLModel, Field, Session, create_engine, select
 from passlib.context import CryptContext
 import jwt
+from icalendar import Calendar as ICalCalendar
 
 # ------------------------------------------------------------------
 # 1. Database Setup
@@ -63,7 +64,6 @@ class Event(SQLModel, table=True):
 # ------------------------------------------------------------------
 # 3. Schemas
 # ------------------------------------------------------------------
-
 class UserRegister(BaseModel):
     username: str
     display_name: Optional[str] = None
@@ -183,7 +183,6 @@ def health_check():
 # ------------------------------------------------------------------
 # 6. Auth & Profile Routes
 # ------------------------------------------------------------------
-
 @app.post("/api/auth/register", response_model=TokenResponse)
 def register_user(user_data: UserRegister, session: Session = Depends(get_session)):
     existing = session.exec(select(User).where(User.username == user_data.username)).first()
@@ -193,7 +192,6 @@ def register_user(user_data: UserRegister, session: Session = Depends(get_sessio
     user_count = len(session.exec(select(User)).all())
     is_first_user = (user_count == 0)
     
-    # Use provided display_name or fallback to username if blank
     d_name = user_data.display_name.strip() if user_data.display_name else user_data.username
     
     new_user = User(
@@ -402,7 +400,7 @@ def toggle_calendar_share(
     return {"status": "ok"}
 
 # ------------------------------------------------------------------
-# 8. Events Routes
+# 8. Events & ICS Import Routes
 # ------------------------------------------------------------------
 @app.get("/api/events")
 def get_events(
@@ -578,6 +576,94 @@ def delete_event(
         session.delete(event)
         session.commit()
         return {"message": "Entire series deleted"}
+
+@app.post("/api/events/import-ics")
+def import_ics_events(
+    calendar_id: int = Form(...),
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    cal = session.get(Calendar, calendar_id)
+    if not cal:
+        raise HTTPException(status_code=404, detail="Calendar not found")
+
+    content = file.file.read()
+    gcal = ICalCalendar.from_ical(content)
+
+    imported_count = 0
+    for component in gcal.walk():
+        if component.name == "VEVENT":
+            title = str(component.get('summary', 'Untitled Event'))
+            start = component.get('dtstart')
+            end = component.get('dtend')
+            
+            if not start:
+                continue
+            
+            start_dt = start.dt
+            if hasattr(start_dt, 'strftime'):
+                date_str = start_dt.strftime("%Y-%m-%d")
+                time_str = start_dt.strftime("%H:%M") if hasattr(start_dt, 'hour') else None
+            else:
+                date_str = str(start_dt)
+                time_str = None
+
+            end_time_str = None
+            if end:
+                end_dt = end.dt
+                if hasattr(end_dt, 'strftime') and hasattr(end_dt, 'hour'):
+                    end_time_str = end_dt.strftime("%H:%M")
+
+            db_event = Event(
+                title=title,
+                date=date_str,
+                start_time=time_str,
+                end_time=end_time_str,
+                rrule=None
+            )
+            session.add(db_event)
+            session.commit()
+            session.refresh(db_event)
+
+            link = EventCalendarLink(event_id=db_event.id, calendar_id=calendar_id)
+            session.add(link)
+            session.commit()
+            imported_count += 1
+
+    return {"message": f"Successfully imported {imported_count} events."}
+
+@app.delete("/api/events/cleanup-past")
+def cleanup_past_events(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    owned_calendars = session.exec(select(Calendar).where(Calendar.owner_id == current_user.id)).all()
+    owned_cal_ids = [c.id for c in owned_calendars]
+    
+    if not owned_cal_ids:
+        return {"deleted_count": 0, "message": "No owned calendars found."}
+
+    links = session.exec(select(EventCalendarLink).where(EventCalendarLink.calendar_id.in_(owned_cal_ids))).all()
+    event_ids = list(set([l.event_id for l in links]))
+    
+    if not event_ids:
+        return {"deleted_count": 0, "message": "No events found to clean up."}
+
+    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+    user_events = session.exec(select(Event).where(Event.id.in_(event_ids))).all()
+
+    deleted_count = 0
+    for event in user_events:
+        if not event.rrule and event.date < today_str:
+            event_links = session.exec(select(EventCalendarLink).where(EventCalendarLink.event_id == event.id)).all()
+            for link in event_links:
+                session.delete(link)
+            session.delete(event)
+            deleted_count += 1
+
+    session.commit()
+    return {"deleted_count": deleted_count, "message": f"Successfully deleted {deleted_count} past non-recurring events."}
 
 # ------------------------------------------------------------------
 # 9. Admin Endpoints

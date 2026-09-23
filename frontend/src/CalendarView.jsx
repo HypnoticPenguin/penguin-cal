@@ -64,20 +64,17 @@ export default function CalendarView({ events, themeColors, onDateSelect, onEven
       }}
     >
       <style>{`
-        /* Force container baseline colors */
         div.fc {
           color: ${themeColors.text} !important;
           background-color: ${themeColors.cardBg} !important;
         }
 
-        /* Border colors across standard tables and cells */
         div.fc .fc-theme-standard td, 
         div.fc .fc-theme-standard th,
         div.fc .fc-scrollgrid {
           border-color: ${themeColors.border} !important;
         }
 
-        /* Toolbar header title & navigation buttons */
         div.fc .fc-toolbar-title {
           color: ${themeColors.text} !important;
         }
@@ -87,7 +84,6 @@ export default function CalendarView({ events, themeColors, onDateSelect, onEven
           color: #ffffff !important;
         }
 
-        /* Column Headers (Day of Week e.g., Mon, Tue, Wed) */
         div.fc .fc-col-header-cell {
           background-color: ${themeColors.accentBg || themeColors.cardBg} !important;
         }
@@ -98,7 +94,6 @@ export default function CalendarView({ events, themeColors, onDateSelect, onEven
           text-decoration: none !important;
         }
 
-        /* Day Numbers & Time Slot Labels */
         div.fc .fc-daygrid-day-number,
         div.fc a.fc-daygrid-day-number,
         div.fc .fc-timegrid-slot-label-cushion,
@@ -107,25 +102,21 @@ export default function CalendarView({ events, themeColors, onDateSelect, onEven
           text-decoration: none !important;
         }
 
-        /* TimeGrid All-Day Header Row & Cells */
         div.fc .fc-timegrid-slot,
         div.fc .fc-timegrid-slot-label,
         div.fc .fc-daygrid-day {
           background-color: ${themeColors.cardBg} !important;
         }
 
-        /* Specific style override for the "Today" cell highlight */
         div.fc .fc-day-today {
           background-color: ${themeColors.accentBg || 'rgba(33, 150, 243, 0.12)'} !important;
         }
 
-        /* Active click/drag selection highlight */
         div.fc .fc-highlight {
           background-color: ${themeColors.primary} !important;
           opacity: 0.3 !important;
         }
 
-        /* Event box typography and line wrapping */
         div.fc .fc-event {
           white-space: normal !important;
           padding: 2px 4px !important;
@@ -144,6 +135,7 @@ export default function CalendarView({ events, themeColors, onDateSelect, onEven
           right: 'dayGridMonth,timeGridWeek,timeGridDay'
         }}
         events={formattedEvents}
+        eventDisplay="block"
         selectable={true}
         dayMaxEvents={false}
         eventTimeFormat={{

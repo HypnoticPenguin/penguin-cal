@@ -23,7 +23,6 @@ export default function App() {
 
   const currentTheme = themes[themeKey] || themes.light
 
-  // Load user-specific theme when currentUser changes
   useEffect(() => {
     if (currentUser) {
       const userSavedTheme = localStorage.getItem(`theme_${currentUser.id}`) || 'light'
@@ -33,7 +32,6 @@ export default function App() {
     }
   }, [currentUser])
 
-  // Save theme under the specific logged-in user's ID
   const handleThemeChange = (newTheme) => {
     setThemeKey(newTheme)
     if (currentUser) {
@@ -141,6 +139,12 @@ export default function App() {
     return evt.calendar_ids.some((calId) => activeCalendarIds.includes(calId))
   })
 
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const upcomingEvents = visibleEvents.filter((evt) => {
+    if (evt.rrule) return true
+    return evt.date >= todayStr
+  })
+
   return (
     <div
       style={{
@@ -151,7 +155,6 @@ export default function App() {
         boxSizing: 'border-box'
       }}
     >
-      {/* Main Content Area */}
       <div
         style={{
           padding: '2rem',
@@ -162,7 +165,6 @@ export default function App() {
           boxSizing: 'border-box'
         }}
       >
-        {/* HEADER SECTION */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <img
@@ -216,10 +218,10 @@ export default function App() {
           onEventClick={(evt) => setModalEvent(evt)}
         />
 
-        <h2 style={{ marginTop: '2rem' }}>Event List</h2>
+        <h2 style={{ marginTop: '2rem' }}>Upcoming Events</h2>
         <ul style={{ listStyle: 'none', padding: 0 }}>
-          {visibleEvents.length > 0 ? (
-            visibleEvents.map((evt) => (
+          {upcomingEvents.length > 0 ? (
+            upcomingEvents.map((evt) => (
               <EventItem
                 key={`${evt.id}-${evt.date}`}
                 event={evt}
@@ -234,7 +236,7 @@ export default function App() {
               />
             ))
           ) : (
-            <p style={{ color: currentTheme.subText }}>No events found for visible calendars.</p>
+            <p style={{ color: currentTheme.subText }}>No upcoming events found for visible calendars.</p>
           )}
         </ul>
 
@@ -269,10 +271,10 @@ export default function App() {
           themeColors={currentTheme}
           onThemeChange={handleThemeChange}
           onUserUpdated={fetchUser}
+          onEventsChanged={fetchEvents}
         />
       </div>
 
-      {/* APPLICATION-WIDE FOOTER */}
       <footer
         style={{
           textAlign: 'center',

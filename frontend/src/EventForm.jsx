@@ -151,7 +151,6 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
           style={{ ...inputStyle, flexGrow: 1, minWidth: '180px' }}
         />
         
-        {/* Date Selector + Today Shortcut */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
           <input
             type="date"
@@ -208,7 +207,6 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
         </select>
       </div>
 
-      {/* Duration Quick Presets including All Day */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
         <span style={{ fontWeight: 'bold', color: theme.subText }}>Duration presets:</span>
         {[

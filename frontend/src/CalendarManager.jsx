@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { apiFetch } from './api.js'
 
 export default function CalendarManager({
@@ -13,6 +13,19 @@ export default function CalendarManager({
   const [editName, setEditName] = useState('')
   const [editColor, setEditColor] = useState('#2196F3')
   const [sharesMap, setSharesMap] = useState({})
+  
+  // ICS Import States
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importCalId, setImportCalId] = useState('')
+  const [importFile, setImportFile] = useState(null)
+  const [importLoading, setImportLoading] = useState(false)
+  const [importMessage, setImportMessage] = useState('')
+
+  useEffect(() => {
+    if (calendars.length > 0 && !importCalId) {
+      setImportCalId(calendars[0].id)
+    }
+  }, [calendars])
 
   const handleCreateCalendar = async (e) => {
     e.preventDefault()
@@ -92,6 +105,44 @@ export default function CalendarManager({
     }
   }
 
+  const handleIcsUpload = async (e) => {
+    e.preventDefault()
+    if (!importFile || !importCalId) return
+
+    setImportLoading(true)
+    setImportMessage('')
+    const formData = new FormData()
+    formData.append('calendar_id', importCalId)
+    formData.append('file', importFile)
+
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch('/api/events/import-ics', {
+        method: 'POST',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: formData
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setImportMessage(data.message)
+        setTimeout(() => {
+          setShowImportModal(false)
+          setImportFile(null)
+          setImportMessage('')
+          onCalendarCreated()
+        }, 1500)
+      } else {
+        setImportMessage(data.detail || 'Import failed.')
+      }
+    } catch (err) {
+      setImportMessage('Network error during import.')
+    } finally {
+      setImportLoading(false)
+    }
+  }
+
   return (
     <div
       style={{
@@ -104,7 +155,26 @@ export default function CalendarManager({
         transition: 'all 0.3s ease'
       }}
     >
-      <h3 style={{ marginTop: 0 }}>My Calendars</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h3 style={{ margin: 0 }}>My Calendars</h3>
+        <button
+          type="button"
+          onClick={() => setShowImportModal(true)}
+          style={{
+            padding: '0.4rem 0.8rem',
+            background: theme.primary,
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '0.85rem',
+            fontWeight: 'bold'
+          }}
+        >
+          Import .ics File
+        </button>
+      </div>
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
         {calendars.map((cal) => (
           <div
@@ -227,6 +297,7 @@ export default function CalendarManager({
           </div>
         ))}
       </div>
+
       <form onSubmit={handleCreateCalendar} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
         <input
           type="text"
@@ -243,6 +314,46 @@ export default function CalendarManager({
           Add Calendar
         </button>
       </form>
+
+      {/* ICS Import Modal */}
+      {showImportModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: theme.cardBg, color: theme.text, padding: '1.5rem', borderRadius: '8px', width: '400px', border: `1px solid ${theme.border}`, boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ marginTop: 0 }}>Import Calendar (.ics)</h3>
+            {importMessage && <p style={{ fontSize: '0.9rem', color: theme.primary, marginBottom: '0.75rem' }}>{importMessage}</p>}
+            <form onSubmit={handleIcsUpload} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Target Calendar</label>
+                <select 
+                  value={importCalId} 
+                  onChange={(e) => setImportCalId(e.target.value)}
+                  style={{ width: '100%', padding: '0.5rem', background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '4px', boxSizing: 'border-box' }}
+                >
+                  {calendars.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Select .ics File</label>
+                <input 
+                  type="file" 
+                  accept=".ics"
+                  onChange={(e) => setImportFile(e.target.files[0])}
+                  required
+                  style={{ width: '100%', color: theme.text }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                <button type="button" onClick={() => setShowImportModal(false)} style={{ padding: '0.5rem 1rem', background: '#888', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" disabled={importLoading} style={{ padding: '0.5rem 1rem', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+                  {importLoading ? 'Importing...' : 'Import Events'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
