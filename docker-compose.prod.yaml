@@ -1,0 +1,52 @@
+services:
+  backend:
+    build: ./backend
+    container_name: ${PENGUIN_SERVICE:-penguin}-backend
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    networks:
+      - internal
+    volumes:
+      - penguin_data:/app/data
+
+  frontend:
+    build: ./frontend
+    container_name: ${PENGUIN_SERVICE:-penguin}
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    networks:
+      - traefik_default
+      - internal
+    depends_on:
+      - backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.penguin.entrypoints=web, websecure"
+      - "traefik.http.routers.penguin.rule=Host(`${PENGUIN_SERVICE:-penguin}.${DOMAIN}`)"
+      - "traefik.http.routers.penguin.tls=true"
+      - "traefik.http.routers.penguin.tls.certresolver=cloudflare"
+      - "traefik.http.routers.penguin.service=${PENGUIN_SERVICE:-penguin}"
+      - "traefik.http.services.penguin.loadbalancer.server.port=80"
+      - "traefik.docker.network=traefik_default"
+      - "traefik.http.routers.penguin.middlewares=secured@file"
+
+      # Homepage Dashboard Labels
+      - "homepage.group=${PENGUIN_GROUP:-Services}"
+      - "homepage.name=${PENGUIN_SERVICE_NAME:-Penguin Cal}"
+      - "homepage.icon=calendar.png"
+      - "homepage.href=https://${PENGUIN_SERVICE:-penguin}.${DOMAIN}/"
+      - "homepage.description=${PENGUIN_DESCRIPTION:-Lightweight multi-calendar suite}"
+
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+
+volumes:
+  penguin_data:
+
+networks:
+  traefik_default:
+    external: true
+  internal:
+    driver: bridge
