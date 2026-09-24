@@ -21,13 +21,34 @@ export default function App() {
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [themeKey, setThemeKey] = useState('light')
   const [dateFormat, setDateFormat] = useState('YYYY-MM-DD')
+  const [showPastEvents, setShowPastEvents] = useState(false)
+  
+  // Default start date to today, and end date to 3 months in the future
+  const todayObj = new Date()
+  const todayStr = todayObj.toISOString().slice(0, 10)
+  
+  const futureObj = new Date()
+  futureObj.setMonth(futureObj.getMonth() + 3)
+  const futureStr = futureObj.toISOString().slice(0, 10)
+
+  const [filterStartDate, setFilterStartDate] = useState(todayStr)
+  const [filterEndDate, setFilterEndDate] = useState(futureStr)
+
   const currentTheme = themes[themeKey] || themes.light
 
   useEffect(() => {
     if (currentUser) {
-      const userSavedTheme = localStorage.getItem(`theme_${currentUser.id}`) || 'light'
-      const userSavedFormat = localStorage.getItem(`dateFormat_${currentUser.id}`) || 'YYYY-MM-DD'
+      const storageKey = `theme_${currentUser.id}`
+      let userSavedTheme = localStorage.getItem(storageKey)
+      
+      if (!userSavedTheme) {
+        userSavedTheme = 'light'
+        localStorage.setItem(storageKey, 'light')
+      }
+      
       setThemeKey(userSavedTheme)
+
+      const userSavedFormat = localStorage.getItem(`dateFormat_${currentUser.id}`) || 'YYYY-MM-DD'
       setDateFormat(userSavedFormat)
     } else {
       setThemeKey('light')
@@ -149,12 +170,42 @@ export default function App() {
     if (!evt.calendar_ids || evt.calendar_ids.length === 0) return false
     return evt.calendar_ids.some((calId) => activeCalendarIds.includes(calId))
   })
+  
+  // Filter and sort events chronologically by start date
+  const filteredEvents = visibleEvents.filter((evt) => {
+    let hasEnded = false
+    if (evt.rrule) {
+      const untilMatch = evt.rrule.match(/UNTIL=([0-9TZ]+)/)
+      if (untilMatch) {
+        const untilStr = untilMatch[1]
+        const year = untilStr.slice(0, 4)
+        const month = untilStr.slice(4, 6)
+        const day = untilStr.slice(6, 8)
+        const untilDate = `${year}-${month}-${day}`
+        if (untilDate < todayStr) {
+          hasEnded = true
+        }
+      }
+    } else {
+      if (evt.date < todayStr) {
+        hasEnded = true
+      }
+    }
 
-  const todayStr = new Date().toISOString().slice(0, 10)
-  const upcomingEvents = visibleEvents.filter((evt) => {
-    if (evt.rrule) return true
-    return evt.date >= todayStr
-  })
+    if (!showPastEvents && hasEnded) {
+      return false
+    }
+
+    if (filterStartDate && evt.date < filterStartDate) {
+      return false
+    }
+
+    if (filterEndDate && evt.date > filterEndDate) {
+      return false
+    }
+
+    return true
+  }).sort((a, b) => a.date.localeCompare(b.date))
 
   return (
     <div
@@ -166,7 +217,6 @@ export default function App() {
         boxSizing: 'border-box'
       }}
     >
-      {/* Global CSS Injector for Mobile Responsive Layouts */}
       <style>{`
         @media (max-width: 768px) {
           .app-container {
@@ -253,7 +303,6 @@ export default function App() {
         <h2>Create New Event</h2>
         <EventForm calendars={calendars} theme={currentTheme} onEventAdded={fetchEvents} defaultDate={selectedDate} />
 
-        <h2>Calendar Grid</h2>
         <CalendarView
           events={visibleEvents}
           themeColors={currentTheme}
@@ -262,10 +311,49 @@ export default function App() {
           onEventClick={(evt) => setModalEvent(evt)}
         />
 
-        <h2 style={{ marginTop: '2rem' }}>Upcoming Events</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2rem', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <h2 style={{ margin: 0 }}>Events</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem' }}>
+              <span style={{ fontWeight: 'bold', color: currentTheme.subText }}>From:</span>
+              <input
+                type="date"
+                value={filterStartDate}
+                onChange={(e) => setFilterStartDate(e.target.value)}
+                style={{ padding: '0.25rem 0.4rem', background: currentTheme.cardBg, color: currentTheme.text, border: `1px solid ${currentTheme.border}`, borderRadius: '4px' }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem' }}>
+              <span style={{ fontWeight: 'bold', color: currentTheme.subText }}>To:</span>
+              <input
+                type="date"
+                value={filterEndDate}
+                onChange={(e) => setFilterEndDate(e.target.value)}
+                style={{ padding: '0.25rem 0.4rem', background: currentTheme.cardBg, color: currentTheme.text, border: `1px solid ${currentTheme.border}`, borderRadius: '4px' }}
+              />
+            </div>
+            {(filterStartDate !== todayStr || filterEndDate !== futureStr) && (
+              <button
+                onClick={() => { setFilterStartDate(todayStr); setFilterEndDate(futureStr); }}
+                style={{ padding: '0.25rem 0.5rem', background: 'transparent', color: currentTheme.primary, border: `1px solid ${currentTheme.primary}`, borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+              >
+                Reset Dates
+              </button>
+            )}
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', cursor: 'pointer', background: currentTheme.cardBg, padding: '0.3rem 0.6rem', borderRadius: '4px', border: `1px solid ${currentTheme.border}` }}>
+              <input
+                type="checkbox"
+                checked={showPastEvents}
+                onChange={(e) => setShowPastEvents(e.target.checked)}
+              />
+              Show past events
+            </label>
+          </div>
+        </div>
+
         <ul style={{ listStyle: 'none', padding: 0 }}>
-          {upcomingEvents.length > 0 ? (
-            upcomingEvents.map((evt) => (
+          {filteredEvents.length > 0 ? (
+            filteredEvents.map((evt) => (
               <EventItem
                 key={`${evt.id}-${evt.date}`}
                 event={evt}
@@ -281,7 +369,7 @@ export default function App() {
               />
             ))
           ) : (
-            <p style={{ color: currentTheme.subText }}>No upcoming events found for visible calendars.</p>
+            <p style={{ color: currentTheme.subText }}>No events found matching the selected range.</p>
           )}
         </ul>
 

@@ -6,7 +6,9 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
   const [date, setDate] = useState('')
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
+  const [notes, setNotes] = useState('')
   const [selectedCalIds, setSelectedCalIds] = useState([])
+  const [activePreset, setActivePreset] = useState(null)
   
   // Advanced Recurrence States
   const [freq, setFreq] = useState('')
@@ -60,7 +62,8 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
     )
   }
 
-  const applyDurationPreset = (minutes) => {
+  const applyDurationPreset = (minutes, label) => {
+    setActivePreset(label)
     if (minutes === 'ALL_DAY') {
       setStartTime('')
       setEndTime('')
@@ -110,6 +113,7 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
           date,
           start_time: startTime || null,
           end_time: endTime || null,
+          notes: notes || null,
           calendar_ids: selectedCalIds,
           rrule
         }),
@@ -120,12 +124,14 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
         setDate('')
         setStartTime('')
         setEndTime('')
+        setNotes('')
         setFreq('')
         setInterval(1)
         setEndType('never')
         setUntilDate('')
         setCount(10)
         setSelectedDays([])
+        setActivePreset(null)
       }
     } catch (error) {
       console.error('Error submitting event:', error)
@@ -199,7 +205,10 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
           <input
             type="time"
             value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
+            onChange={(e) => {
+              setStartTime(e.target.value)
+              setActivePreset(null)
+            }}
             style={{ ...inputStyle, flex: 1 }}
             title="Start Time"
           />
@@ -207,11 +216,22 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
           <input
             type="time"
             value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
+            onChange={(e) => {
+              setEndTime(e.target.value)
+              setActivePreset(null)
+            }}
             style={{ ...inputStyle, flex: 1 }}
             title="End Time"
           />
         </div>
+
+        <textarea
+          placeholder="Notes (optional)"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+          style={{ ...inputStyle, width: '100%', resize: 'vertical' }}
+        />
 
         <select
           value={freq}
@@ -285,24 +305,29 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
             { label: '+1 hr', mins: 60 },
             { label: '+2 hrs', mins: 120 },
             { label: '+4 hrs', mins: 240 }
-          ].map((p) => (
-            <button
-              type="button"
-              key={p.label}
-              onClick={() => applyDurationPreset(p.mins)}
-              style={{
-                padding: '0.25rem 0.5rem',
-                border: `1px solid ${theme.border}`,
-                borderRadius: '4px',
-                background: theme.bg,
-                color: theme.text,
-                cursor: 'pointer',
-                fontSize: '0.8rem'
-              }}
-            >
-              {p.label}
-            </button>
-          ))}
+          ].map((p) => {
+            const isActive = activePreset === p.label
+            return (
+              <button
+                type="button"
+                key={p.label}
+                onClick={() => applyDurationPreset(p.mins, p.label)}
+                style={{
+                  padding: '0.25rem 0.5rem',
+                  border: `1px solid ${isActive ? theme.primary : theme.border}`,
+                  borderRadius: '4px',
+                  background: isActive ? theme.primary : theme.bg,
+                  color: isActive ? '#fff' : theme.text,
+                  cursor: 'pointer',
+                  fontSize: '0.8rem',
+                  fontWeight: isActive ? 'bold' : 'normal',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {p.label}
+              </button>
+            )
+          })}
         </div>
       </div>
 

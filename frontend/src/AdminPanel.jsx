@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from './api.js'
+import ConfirmModal from './ConfirmModal.jsx'
 
 export default function AdminPanel({ currentUserId, theme }) {
   const [users, setUsers] = useState([])
   const [error, setError] = useState('')
+  const [modalConfig, setModalConfig] = useState({ isOpen: false, title: '', message: '', action: null, color: '#4CAF50' })
 
   const fetchUsers = async () => {
     try {
@@ -23,22 +25,53 @@ export default function AdminPanel({ currentUserId, theme }) {
     fetchUsers()
   }, [])
 
-  const handleDeleteUser = async (userId, username) => {
-    const confirmDelete = window.confirm(
-      `Are you sure you want to delete user "${username}"?\nThis will permanently remove their account and all their calendar events.`
-    )
-    if (!confirmDelete) return
-    try {
-      const res = await apiFetch(`/admin/users/${userId}`, { method: 'DELETE' })
-      if (res.ok) {
-        fetchUsers()
-      } else {
-        const data = await res.json()
-        alert(data.detail || 'Failed to delete user')
+  const handleToggleAdminClick = (userId, username, currentStatus) => {
+    const actionText = currentStatus ? 'revoke admin privileges from' : 'grant admin privileges to'
+    setModalConfig({
+      isOpen: true,
+      title: currentStatus ? 'Revoke Admin Privileges?' : 'Grant Admin Privileges?',
+      message: `Are you sure you want to ${actionText} "${username}"?`,
+      confirmText: currentStatus ? 'Yes, Revoke' : 'Yes, Grant',
+      color: '#ffa726',
+      action: async () => {
+        try {
+          const res = await apiFetch(`/admin/users/${userId}/toggle-admin`, { method: 'PATCH' })
+          if (res.ok) {
+            fetchUsers()
+          } else {
+            const data = await res.json()
+            alert(data.detail || 'Failed to update admin status')
+          }
+        } catch (err) {
+          console.error('Error updating admin status:', err)
+        }
+        setModalConfig({ isOpen: false })
       }
-    } catch (err) {
-      console.error('Error deleting user:', err)
-    }
+    })
+  }
+
+  const handleDeleteUserClick = (userId, username) => {
+    setModalConfig({
+      isOpen: true,
+      title: 'Delete User Account?',
+      message: `Are you sure you want to delete user "${username}"?\nThis will permanently remove their account and all their calendar events.`,
+      confirmText: 'Yes, Delete',
+      color: '#d32f2f',
+      action: async () => {
+        try {
+          const res = await apiFetch(`/admin/users/${userId}`, { method: 'DELETE' })
+          if (res.ok) {
+            fetchUsers()
+          } else {
+            const data = await res.json()
+            alert(data.detail || 'Failed to delete user')
+          }
+        } catch (err) {
+          console.error('Error deleting user:', err)
+        }
+        setModalConfig({ isOpen: false })
+      }
+    })
   }
 
   return (
@@ -91,6 +124,8 @@ export default function AdminPanel({ currentUserId, theme }) {
             border-bottom: none;
             justify-content: flex-end;
             margin-top: 0.5rem;
+            gap: 0.5rem;
+            flex-direction: column;
           }
         }
       `}</style>
@@ -156,29 +191,58 @@ export default function AdminPanel({ currentUserId, theme }) {
                 )}
               </td>
               <td style={{ textAlign: 'right' }}>
-                {user.id !== currentUserId && (
-                  <button
-                    onClick={() => handleDeleteUser(user.id, user.username)}
-                    style={{
-                      background: '#d32f2f',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      padding: '0.4rem 0.8rem',
-                      cursor: 'pointer',
-                      fontWeight: 'bold',
-                      fontSize: '0.85rem',
-                      width: '100%'
-                    }}
-                  >
-                    Delete Account
-                  </button>
-                )}
+                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                  {user.id !== currentUserId && (
+                    <button
+                      onClick={() => handleToggleAdminClick(user.id, user.username, user.is_admin)}
+                      style={{
+                        background: user.is_admin ? '#ffa726' : '#2196F3',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '0.4rem 0.8rem',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      {user.is_admin ? 'Revoke Admin' : 'Make Admin'}
+                    </button>
+                  )}
+                  {user.id !== currentUserId && (
+                    <button
+                      onClick={() => handleDeleteUserClick(user.id, user.username)}
+                      style={{
+                        background: '#d32f2f',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '0.4rem 0.8rem',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      Delete Account
+                    </button>
+                  )}
+                </div>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+
+      <ConfirmModal
+        isOpen={modalConfig.isOpen}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        confirmText={modalConfig.confirmText}
+        confirmColor={modalConfig.color}
+        theme={theme}
+        onConfirm={modalConfig.action}
+        onClose={() => setModalConfig({ isOpen: false })}
+      />
     </div>
   )
 }

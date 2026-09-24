@@ -151,7 +151,7 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
         headerToolbar={{
           left: 'prev,next today',
           center: 'title',
-          right: 'dayGridMonth,timeGridWeek,timeGridDay'
+          right: 'timeGridDay,timeGridWeek,dayGridMonth'
         }}
         events={formattedEvents}
         eventDisplay="block"
@@ -178,9 +178,11 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
         select={(selectInfo) => onDateSelect && onDateSelect(selectInfo.startStr.slice(0, 10))}
         eventClick={(clickInfo) => {
           const rawEvent = clickInfo.event.extendedProps.rawEvent
+          const isRecurring = Boolean(rawEvent.rrule)
           const eventForModal = {
             ...rawEvent,
-            date: clickInfo.event.startStr ? clickInfo.event.startStr.slice(0, 10) : rawEvent.date
+            // Preserve master start date for recurring series, otherwise use clicked instance date
+            date: isRecurring ? rawEvent.date : (clickInfo.event.startStr ? clickInfo.event.startStr.slice(0, 10) : rawEvent.date)
           }
           if (onEventClick) {
             onEventClick(eventForModal)

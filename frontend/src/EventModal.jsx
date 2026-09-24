@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react'
+import RecurrenceBuilder from './RecurrenceBuilder.jsx'
 
 export default function EventModal({ isOpen, event, calendars = [], theme, onClose, onSave, onDelete }) {
   const [title, setTitle] = useState('')
   const [date, setDate] = useState('')
+  const [originalDate, setOriginalDate] = useState('')
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
+  const [notes, setNotes] = useState('')
   const [selectedCalIds, setSelectedCalIds] = useState([])
+  const [showDateChangeConfirm, setShowDateChangeConfirm] = useState(false)
   
-  // Advanced Recurrence States for Modal
+  // Standardized Recurrence States
   const [freq, setFreq] = useState('')
   const [interval, setInterval] = useState(1)
   const [endType, setEndType] = useState('never')
@@ -16,23 +20,16 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
   const [selectedDays, setSelectedDays] = useState([])
   const [monthDay, setMonthDay] = useState(1)
 
-  const daysOfWeek = [
-    { label: 'Mon', value: 'MO' },
-    { label: 'Tue', value: 'TU' },
-    { label: 'Wed', value: 'WE' },
-    { label: 'Thu', value: 'TH' },
-    { label: 'Fri', value: 'FR' },
-    { label: 'Sat', value: 'SA' },
-    { label: 'Sun', value: 'SU' },
-  ]
-
   useEffect(() => {
     if (event) {
       setTitle(event.title || '')
       setDate(event.date || '')
+      setOriginalDate(event.date || '')
       setStartTime(event.start_time || event.time || '')
       setEndTime(event.end_time || '')
+      setNotes(event.notes || '')
       setSelectedCalIds(event.calendar_ids || (calendars[0] ? [calendars[0].id] : []))
+      setShowDateChangeConfirm(false)
       
       const rruleStr = event.rrule || ''
       if (rruleStr) {
@@ -77,12 +74,6 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
     )
   }
 
-  const toggleDay = (dayVal) => {
-    setSelectedDays((prev) =>
-      prev.includes(dayVal) ? prev.filter((d) => d !== dayVal) : [...prev, dayVal]
-    )
-  }
-
   const buildRruleString = () => {
     if (!freq) return null
     let parts = [`FREQ=${freq}`]
@@ -104,17 +95,28 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
     return parts.join(';')
   }
 
-  const handleFormSubmit = (e) => {
-    e.preventDefault()
-    if (selectedCalIds.length === 0) return
+  const executeSave = () => {
     onSave(event.id, {
       title,
       date,
       start_time: startTime || null,
       end_time: endTime || null,
+      notes: notes || null,
       calendar_ids: selectedCalIds,
       rrule: buildRruleString()
     })
+  }
+
+  const handleFormSubmit = (e) => {
+    e.preventDefault()
+    if (selectedCalIds.length === 0) return
+
+    if (isRecurring && date !== originalDate && !showDateChangeConfirm) {
+      setShowDateChangeConfirm(true)
+      return
+    }
+
+    executeSave()
   }
 
   const activeTheme = theme || {
@@ -162,7 +164,8 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
           overflowY: 'auto',
           border: `1px solid ${activeTheme.border}`,
           boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          transition: 'all 0.3s ease'
+          transition: 'all 0.3s ease',
+          boxSizing: 'border-box'
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -178,218 +181,185 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
                 fontWeight: 'bold'
               }}
             >
-              📅 All-Day Event
+              All-Day Event
             </span>
           )}
         </div>
-        <form onSubmit={handleFormSubmit}>
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Title</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              style={inputStyle}
-            />
+
+        {showDateChangeConfirm ? (
+          <div style={{ background: activeTheme.bg, padding: '1.25rem', borderRadius: '6px', border: `1px solid ${activeTheme.border}`, textAlign: 'center', marginBottom: '1rem' }}>
+            <h4 style={{ margin: '0 0 0.75rem 0', color: '#ff9800' }}>Shift Recurring Series Start Date?</h4>
+            <p style={{ fontSize: '0.9rem', marginBottom: '1.25rem', lineHeight: '1.4' }}>
+              You are changing the start date from <strong>{originalDate}</strong> to <strong>{date}</strong>. This will shift the start date for <strong>all instances</strong> of this recurring event. Do you want to proceed?
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setShowDateChangeConfirm(false)}
+                style={{ padding: '0.5rem 1rem', background: '#888', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                No, Keep Original
+              </button>
+              <button
+                type="button"
+                onClick={executeSave}
+                style={{ padding: '0.5rem 1rem', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                Yes, Change All
+              </button>
+            </div>
           </div>
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Date</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-              style={inputStyle}
-            />
-          </div>
-          <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Start Time</label>
+        ) : (
+          <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div>
+              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Title</label>
               <input
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
                 style={inputStyle}
               />
             </div>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>End Time</label>
+            <div>
+              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>
+                Date {isRecurring && <span style={{ fontSize: '0.75rem', color: '#ff9800', fontWeight: 'normal' }}>(Editing will shift all series instances)</span>}
+              </label>
               <input
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
                 style={inputStyle}
               />
             </div>
-          </div>
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Calendars</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-              {calendars.map((c) => (
-                <label
-                  key={c.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
-                    background: activeTheme.bg,
-                    padding: '0.25rem 0.5rem',
-                    borderRadius: '4px',
-                    border: `1px solid ${activeTheme.border}`
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedCalIds.includes(c.id)}
-                    onChange={() => toggleCalendar(c.id)}
-                  />
-                  <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: c.color }}></span>
-                  {c.name}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Recurrence</label>
-            <select
-              value={freq}
-              onChange={(e) => setFreq(e.target.value)}
-              style={inputStyle}
-            >
-              <option value="">Does not repeat</option>
-              <option value="DAILY">Daily</option>
-              <option value="WEEKLY">Weekly</option>
-              <option value="MONTHLY">Monthly</option>
-              <option value="YEARLY">Yearly</option>
-            </select>
-          </div>
-
-          {freq && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem', background: activeTheme.bg, padding: '0.75rem', borderRadius: '4px', border: `1px solid ${activeTheme.border}` }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Every:</span>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '130px' }}>
+                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Start Time</label>
                 <input
-                  type="number"
-                  min="1"
-                  max="99"
-                  value={interval}
-                  onChange={(e) => setInterval(Number(e.target.value))}
-                  style={{ ...inputStyle, width: '60px', padding: '0.3rem' }}
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  style={inputStyle}
                 />
-                <span style={{ fontSize: '0.85rem' }}>
-                  {freq === 'DAILY' ? 'day(s)' : freq === 'WEEKLY' ? 'week(s)' : freq === 'MONTHLY' ? 'month(s)' : 'year(s)'}
-                </span>
               </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Ends:</span>
-                <select
-                  value={endType}
-                  onChange={(e) => setEndType(e.target.value)}
-                  style={{ ...inputStyle, width: 'auto', padding: '0.3rem' }}
-                >
-                  <option value="never">Never</option>
-                  <option value="until">On date</option>
-                  <option value="count">After occurrences</option>
-                </select>
-                {endType === 'until' && (
-                  <input
-                    type="date"
-                    value={untilDate}
-                    onChange={(e) => setUntilDate(e.target.value)}
-                    required
-                    style={{ ...inputStyle, width: 'auto', padding: '0.3rem' }}
-                  />
-                )}
-                {endType === 'count' && (
-                  <input
-                    type="number"
-                    min="1"
-                    max="999"
-                    value={count}
-                    onChange={(e) => setCount(Number(e.target.value))}
-                    style={{ ...inputStyle, width: '70px', padding: '0.3rem' }}
-                  />
-                )}
+              <div style={{ flex: 1, minWidth: '130px' }}>
+                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>End Time</label>
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  style={inputStyle}
+                />
               </div>
-
-              {freq === 'WEEKLY' && (
-                <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>On:</span>
-                  {daysOfWeek.map((day) => (
-                    <button
-                      type="button"
-                      key={day.value}
-                      onClick={() => toggleDay(day.value)}
-                      style={{
-                        padding: '0.2rem 0.4rem',
-                        border: `1px solid ${activeTheme.border}`,
-                        borderRadius: '4px',
-                        background: selectedDays.includes(day.value) ? activeTheme.primary : activeTheme.cardBg,
-                        color: selectedDays.includes(day.value) ? '#fff' : activeTheme.text,
-                        cursor: 'pointer',
-                        fontSize: '0.8rem'
-                      }}
-                    >
-                      {day.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {freq === 'MONTHLY' && (
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Day of month:</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max="31"
-                    value={monthDay}
-                    onChange={(e) => setMonthDay(Number(e.target.value))}
-                    style={{ ...inputStyle, width: '60px', padding: '0.3rem' }}
-                  />
-                </div>
-              )}
             </div>
-          )}
+            <div>
+              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Notes</label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+                style={{ ...inputStyle, resize: 'vertical' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Calendars</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                {calendars.map((c) => (
+                  <label
+                    key={c.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      background: activeTheme.bg,
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '4px',
+                      border: `1px solid ${activeTheme.border}`
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedCalIds.includes(c.id)}
+                      onChange={() => toggleCalendar(c.id)}
+                    />
+                    <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: c.color }}></span>
+                    {c.name}
+                  </label>
+                ))}
+              </div>
+            </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <button
-              type="submit"
-              disabled={selectedCalIds.length === 0}
-              style={{
-                padding: '0.6rem',
-                background: '#4CAF50',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontWeight: 'bold'
-              }}
-            >
-              Save Changes
-            </button>
-            {isRecurring ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => onDelete(event.id, 'single', event.date)}
-                  style={{
-                    padding: '0.6rem',
-                    background: '#ff9800',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  Delete Only This Instance
-                </button>
+            <RecurrenceBuilder
+              freq={freq}
+              setFreq={setFreq}
+              interval={interval}
+              setInterval={setInterval}
+              endType={endType}
+              setEndType={setEndType}
+              untilDate={untilDate}
+              setUntilDate={setUntilDate}
+              count={count}
+              setCount={setCount}
+              selectedDays={selectedDays}
+              setSelectedDays={setSelectedDays}
+              monthDay={monthDay}
+              setMonthDay={setMonthDay}
+              theme={activeTheme}
+            />
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <button
+                type="submit"
+                disabled={selectedCalIds.length === 0}
+                style={{
+                  padding: '0.6rem',
+                  background: '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                Save Changes
+              </button>
+              {isRecurring ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(event.id, 'single', event.date)}
+                    style={{
+                      padding: '0.6rem',
+                      background: '#ff9800',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    Delete Only This Instance
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(event.id, 'all')}
+                    style={{
+                      padding: '0.6rem',
+                      background: '#d32f2f',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    Delete Entire Series
+                  </button>
+                </>
+              ) : (
                 <button
                   type="button"
                   onClick={() => onDelete(event.id, 'all')}
@@ -403,43 +373,27 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
                     fontWeight: 'bold'
                   }}
                 >
-                  Delete Entire Series
+                  Delete Event
                 </button>
-              </>
-            ) : (
+              )}
               <button
                 type="button"
-                onClick={() => onDelete(event.id, 'all')}
+                onClick={onClose}
                 style={{
-                  padding: '0.6rem',
-                  background: '#d32f2f',
-                  color: 'white',
-                  border: 'none',
+                  padding: '0.5rem',
+                  background: activeTheme.bg,
+                  color: activeTheme.text,
+                  border: `1px solid ${activeTheme.border}`,
                   borderRadius: '4px',
                   cursor: 'pointer',
-                  fontWeight: 'bold'
+                  marginTop: '0.5rem'
                 }}
               >
-                Delete Event
+                Cancel
               </button>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: '0.5rem',
-                background: activeTheme.bg,
-                color: activeTheme.text,
-                border: `1px solid ${activeTheme.border}`,
-                borderRadius: '4px',
-                cursor: 'pointer',
-                marginTop: '0.5rem'
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   )

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { apiFetch } from './api.js'
 import { themeList } from './themes.js'
 import AdminPanel from './AdminPanel.jsx'
+import ConfirmModal from './ConfirmModal.jsx'
 
 export default function UserSettingsModal({
   isOpen,
@@ -24,6 +25,7 @@ export default function UserSettingsModal({
   const [passMsg, setPassMsg] = useState({ text: '', isError: false })
   const [cleanupMsg, setCleanupMsg] = useState({ text: '', isError: false })
   const [isCleaning, setIsCleaning] = useState(false)
+  const [showCleanupConfirm, setShowCleanupConfirm] = useState(false)
 
   // ICS Import States
   const [importCalId, setImportCalId] = useState('')
@@ -43,7 +45,24 @@ export default function UserSettingsModal({
     }
   }, [calendars])
 
+  useEffect(() => {
+    if (!isOpen) {
+      setProfileMsg({ text: '', isError: false })
+      setPassMsg({ text: '', isError: false })
+      setCleanupMsg({ text: '', isError: false })
+      setImportMessage('')
+      setShowCleanupConfirm(false)
+    }
+  }, [isOpen])
+
   if (!isOpen) return null
+
+  const clearMessagesExcept = (activeSection) => {
+    if (activeSection !== 'profile') setProfileMsg({ text: '', isError: false })
+    if (activeSection !== 'pass') setPassMsg({ text: '', isError: false })
+    if (activeSection !== 'cleanup') setCleanupMsg({ text: '', isError: false })
+    if (activeSection !== 'import') setImportMessage('')
+  }
 
   const handleProfileSubmit = async (e) => {
     e.preventDefault()
@@ -95,23 +114,31 @@ export default function UserSettingsModal({
   }
 
   const handleCleanupPastEvents = async () => {
-    if (!window.confirm("Are you sure you want to delete all past non-recurring events? This cannot be undone.")) {
-      return
-    }
+    setShowCleanupConfirm(false)
     setIsCleaning(true)
-    setCleanupMsg({ text: '', isError: false })
+    clearMessagesExcept('cleanup')
     try {
       const res = await apiFetch('/events/cleanup-past', {
-        method: 'DELETE'
+        method: 'POST'
       })
-      const data = await res.json()
+      
+      let data = {}
+      try {
+        data = await res.json()
+      } catch (parseErr) {
+        data = { message: 'Cleanup completed successfully.' }
+      }
+
       if (res.ok) {
-        setCleanupMsg({ text: data.message, isError: false })
-        if (onEventsChanged) onEventsChanged()
+        setCleanupMsg({ text: data.message || 'Successfully cleared past events.', isError: false })
+        if (typeof onEventsChanged === 'function') {
+          onEventsChanged()
+        }
       } else {
         setCleanupMsg({ text: data.detail || 'Failed to clean up past events', isError: true })
       }
     } catch (err) {
+      console.error('Cleanup error:', err)
       setCleanupMsg({ text: 'Error executing cleanup request', isError: true })
     } finally {
       setIsCleaning(false)
@@ -122,7 +149,7 @@ export default function UserSettingsModal({
     e.preventDefault()
     if (!importFile || !importCalId) return
     setImportLoading(true)
-    setImportMessage('')
+    clearMessagesExcept('import')
     const formData = new FormData()
     formData.append('calendar_id', importCalId)
     formData.append('file', importFile)
@@ -139,7 +166,7 @@ export default function UserSettingsModal({
       if (res.ok) {
         setImportMessage(data.message)
         setImportFile(null)
-        if (onEventsChanged) onEventsChanged()
+        if (typeof onEventsChanged === 'function') onEventsChanged()
       } else {
         setImportMessage(data.detail || 'Import failed.')
       }
@@ -186,7 +213,8 @@ export default function UserSettingsModal({
           maxHeight: '85vh',
           overflowY: 'auto',
           border: `1px solid ${themeColors.border}`,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          boxSizing: 'border-box'
         }}
       >
         <h2 style={{ marginTop: 0, marginBottom: '1.25rem' }}>Account & App Settings</h2>
@@ -197,7 +225,11 @@ export default function UserSettingsModal({
           </div>
         )}
 
-        <form onSubmit={handleProfileSubmit} style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
+        <form 
+          onSubmit={handleProfileSubmit} 
+          onChange={() => clearMessagesExcept('profile')}
+          style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}
+        >
           <h3 style={{ margin: '0 0 0.75rem 0' }}>Profile</h3>
           {profileMsg.text && (
             <p style={{ color: profileMsg.isError ? '#ff5252' : '#66bb6a', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
@@ -228,7 +260,10 @@ export default function UserSettingsModal({
             <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Calendar Theme</label>
             <select
               value={currentTheme}
-              onChange={(e) => onThemeChange(e.target.value)}
+              onChange={(e) => {
+                clearMessagesExcept('appearance')
+                onThemeChange(e.target.value)
+              }}
               style={inputStyle}
             >
               {themeList.map((t) => (
@@ -242,7 +277,10 @@ export default function UserSettingsModal({
             <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Date Format</label>
             <select
               value={dateFormat}
-              onChange={(e) => onDateFormatChange(e.target.value)}
+              onChange={(e) => {
+                clearMessagesExcept('appearance')
+                onDateFormatChange(e.target.value)
+              }}
               style={inputStyle}
             >
               <option value="YYYY-MM-DD">YYYY-MM-DD (e.g. 2026-09-24)</option>
@@ -256,11 +294,10 @@ export default function UserSettingsModal({
         <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
           <h3 style={{ margin: '0 0 0.75rem 0' }}>Data Management & Imports</h3>
           
-          {/* ICS Import Subsection */}
           <div style={{ marginBottom: '1.25rem' }}>
             <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem' }}>Import Calendar (.ics)</h4>
             {importMessage && <p style={{ fontSize: '0.85rem', color: themeColors.primary, marginBottom: '0.5rem' }}>{importMessage}</p>}
-            <form onSubmit={handleIcsUpload} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <form onSubmit={handleIcsUpload} onChange={() => clearMessagesExcept('import')} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.80rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Target Calendar</label>
                 <select
@@ -293,8 +330,7 @@ export default function UserSettingsModal({
             </form>
           </div>
 
-          {/* Cleanup Subsection */}
-          <div style={{ paddingTop: '0.75rem', borderTop: `1px dashed ${themeColors.border}` }}>
+          <div style={{ paddingTop: '0.75rem', borderTop: `1px dashed ${themeColors.border}` }} onClick={() => clearMessagesExcept('cleanup')}>
             <h4 style={{ margin: '0 0 0.3rem 0', fontSize: '0.95rem' }}>Clear Past Events</h4>
             <p style={{ fontSize: '0.80rem', color: themeColors.subText, marginBottom: '0.75rem' }}>
               Remove old one-off events that occurred before today. Recurring events and future entries are safe.
@@ -307,7 +343,7 @@ export default function UserSettingsModal({
             <button
               type="button"
               disabled={isCleaning}
-              onClick={handleCleanupPastEvents}
+              onClick={() => setShowCleanupConfirm(true)}
               style={{ padding: '0.4rem 0.8rem', background: '#d32f2f', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}
             >
               {isCleaning ? 'Cleaning...' : 'Clear Past Events'}
@@ -315,7 +351,7 @@ export default function UserSettingsModal({
           </div>
         </div>
 
-        <form onSubmit={handlePasswordSubmit}>
+        <form onSubmit={handlePasswordSubmit} onChange={() => clearMessagesExcept('pass')}>
           <h3 style={{ margin: '0 0 0.75rem 0' }}>Change Password</h3>
           {passMsg.text && (
             <p style={{ color: passMsg.isError ? '#ff5252' : '#66bb6a', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
@@ -352,7 +388,7 @@ export default function UserSettingsModal({
               style={inputStyle}
             />
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
             <button
               type="button"
               onClick={onClose}
@@ -369,6 +405,17 @@ export default function UserSettingsModal({
           </div>
         </form>
       </div>
+
+      <ConfirmModal
+        isOpen={showCleanupConfirm}
+        title="Clear Past Non-Recurring Events?"
+        message="Are you sure you want to delete all past non-recurring events? This cannot be undone."
+        confirmText="Yes, Clear"
+        confirmColor="#d32f2f"
+        theme={themeColors}
+        onConfirm={handleCleanupPastEvents}
+        onClose={() => setShowCleanupConfirm(false)}
+      />
     </div>
   )
 }

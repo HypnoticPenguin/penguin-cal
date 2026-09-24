@@ -58,6 +58,7 @@ class Event(SQLModel, table=True):
     date: str
     start_time: Optional[str] = None
     end_time: Optional[str] = None
+    notes: Optional[str] = None
     rrule: Optional[str] = None
     exdates: Optional[str] = None
 
@@ -95,6 +96,7 @@ class EventCreate(BaseModel):
     date: str
     start_time: Optional[str] = None
     end_time: Optional[str] = None
+    notes: Optional[str] = None
     calendar_ids: List[int]
     rrule: Optional[str] = None
 
@@ -103,6 +105,7 @@ class EventUpdate(BaseModel):
     date: str
     start_time: Optional[str] = None
     end_time: Optional[str] = None
+    notes: Optional[str] = None
     calendar_ids: Optional[List[int]] = None
     rrule: Optional[str] = None
 
@@ -442,13 +445,14 @@ def get_events(
             "date": event.date,
             "start_time": event.start_time,
             "end_time": event.end_time,
+            "notes": event.notes,
             "rrule": event.rrule,
             "exdates": exdates_list,
             "calendar_ids": cal_ids,
             "color": color,
             "is_recurring": bool(event.rrule)
         })
-            
+        
     return output
 
 @app.post("/api/events")
@@ -465,6 +469,7 @@ def create_event(
         date=event_data.date,
         start_time=event_data.start_time if event_data.start_time else None,
         end_time=event_data.end_time if event_data.end_time else None,
+        notes=event_data.notes if event_data.notes else None,
         rrule=event_data.rrule if event_data.rrule else None,
         exdates=None
     )
@@ -494,6 +499,7 @@ def update_event(
     event.date = updated_event.date
     event.start_time = updated_event.start_time if updated_event.start_time else None
     event.end_time = updated_event.end_time if updated_event.end_time else None
+    event.notes = updated_event.notes if updated_event.notes else None
     event.rrule = updated_event.rrule if updated_event.rrule else None
     session.add(event)
     
@@ -558,6 +564,7 @@ def import_ics_events(
             title = str(component.get('summary', 'Untitled Event'))
             start = component.get('dtstart')
             end = component.get('dtend')
+            description = str(component.get('description', ''))
             
             if not start:
                 continue
@@ -581,6 +588,7 @@ def import_ics_events(
                 date=date_str,
                 start_time=time_str,
                 end_time=end_time_str,
+                notes=description if description else None,
                 rrule=None
             )
             session.add(db_event)
@@ -592,7 +600,7 @@ def import_ics_events(
             imported_count += 1
     return {"message": f"Successfully imported {imported_count} events."}
 
-@app.delete("/api/events/cleanup-past")
+@app.post("/api/events/cleanup-past")
 def cleanup_past_events(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session)
@@ -609,7 +617,7 @@ def cleanup_past_events(
     if not event_ids:
         return {"deleted_count": 0, "message": "No events found to clean up."}
         
-    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+    today_str = datetime.now().strftime("%Y-%m-%d")
     user_events = session.exec(select(Event).where(Event.id.in_(event_ids))).all()
     deleted_count = 0
     for event in user_events:
@@ -653,3 +661,21 @@ def delete_user(
     session.delete(target_user)
     session.commit()
     return {"message": f"User '{target_user.username}' deleted."}
+
+@app.patch("/api/admin/users/{user_id}/toggle-admin")
+def toggle_admin_status(
+    user_id: int,
+    admin: User = Depends(require_admin),
+    session: Session = Depends(get_session)
+):
+    target_user = session.get(User, user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target_user.id == admin.id:
+        raise HTTPException(status_code=400, detail="Cannot modify your own admin privileges")
+    
+    target_user.is_admin = not target_user.is_admin
+    session.add(target_user)
+    session.commit()
+    session.refresh(target_user)
+    return {"message": f"Admin status updated for '{target_user.username}'.", "is_admin": target_user.is_admin}
