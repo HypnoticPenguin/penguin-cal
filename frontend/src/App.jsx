@@ -146,6 +146,21 @@ export default function App() {
   if (!token) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <style>{`
+          button {
+            transition: all 0.15s ease !important;
+            cursor: pointer !important;
+          }
+          button:active {
+            transform: scale(0.96) !important;
+            opacity: 0.85 !important;
+          }
+          button:disabled {
+            cursor: not-allowed !important;
+            transform: none !important;
+            opacity: 0.6 !important;
+          }
+        `}</style>
         <div style={{ flex: 1 }}>
           <AuthForm onAuthSuccess={() => setToken(localStorage.getItem('token'))} theme={currentTheme} />
         </div>
@@ -171,7 +186,6 @@ export default function App() {
     return evt.calendar_ids.some((calId) => activeCalendarIds.includes(calId))
   })
   
-  // Filter and sort events chronologically by start date
   const filteredEvents = visibleEvents.filter((evt) => {
     let hasEnded = false
     if (evt.rrule) {
@@ -218,6 +232,19 @@ export default function App() {
       }}
     >
       <style>{`
+        button {
+          transition: all 0.15s ease !important;
+          cursor: pointer !important;
+        }
+        button:active {
+          transform: scale(0.96) !important;
+          opacity: 0.85 !important;
+        }
+        button:disabled {
+          cursor: not-allowed !important;
+          transform: none !important;
+          opacity: 0.6 !important;
+        }
         @media (max-width: 768px) {
           .app-container {
             padding: 0.75rem !important;
@@ -357,6 +384,7 @@ export default function App() {
               <EventItem
                 key={`${evt.id}-${evt.date}`}
                 event={evt}
+                calendars={calendars}
                 theme={currentTheme}
                 dateFormat={dateFormat}
                 onDelete={async (id, type, date) => {

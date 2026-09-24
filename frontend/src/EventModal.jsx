@@ -28,7 +28,13 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
       setStartTime(event.start_time || event.time || '')
       setEndTime(event.end_time || '')
       setNotes(event.notes || '')
-      setSelectedCalIds(event.calendar_ids || (calendars[0] ? [calendars[0].id] : []))
+      
+      // Ensure calendar_ids defaults safely to at least the first available calendar if empty
+      const initialCals = event.calendar_ids && event.calendar_ids.length > 0 
+        ? event.calendar_ids 
+        : (calendars[0] ? [calendars[0].id] : [])
+      setSelectedCalIds(initialCals)
+      
       setShowDateChangeConfirm(false)
       
       const rruleStr = event.rrule || ''
@@ -69,9 +75,13 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
   const isAllDay = !startTime && !endTime
 
   const toggleCalendar = (calId) => {
-    setSelectedCalIds((prev) =>
-      prev.includes(calId) ? prev.filter((id) => id !== calId) : [...prev, calId]
-    )
+    setSelectedCalIds((prev) => {
+      // Prevent unchecking if it's the last remaining calendar
+      if (prev.includes(calId) && prev.length === 1) {
+        return prev 
+      }
+      return prev.includes(calId) ? prev.filter((id) => id !== calId) : [...prev, calId]
+    })
   }
 
   const buildRruleString = () => {
@@ -263,32 +273,38 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Calendars</label>
+              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Calendars (At least one required)</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                {calendars.map((c) => (
-                  <label
-                    key={c.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.35rem',
-                      fontSize: '0.85rem',
-                      cursor: 'pointer',
-                      background: activeTheme.bg,
-                      padding: '0.25rem 0.5rem',
-                      borderRadius: '4px',
-                      border: `1px solid ${activeTheme.border}`
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedCalIds.includes(c.id)}
-                      onChange={() => toggleCalendar(c.id)}
-                    />
-                    <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: c.color }}></span>
-                    {c.name}
-                  </label>
-                ))}
+                {calendars.map((c) => {
+                  const isChecked = selectedCalIds.includes(c.id)
+                  const isLastOne = isChecked && selectedCalIds.length === 1
+                  return (
+                    <label
+                      key={c.id}
+                      title={isLastOne ? "Events must belong to at least one calendar" : ""}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        fontSize: '0.85rem',
+                        cursor: isLastOne ? 'not-allowed' : 'pointer',
+                        background: activeTheme.bg,
+                        padding: '0.25rem 0.5rem',
+                        borderRadius: '4px',
+                        border: `1px solid ${activeTheme.border}`,
+                        opacity: isLastOne ? 0.8 : 1
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleCalendar(c.id)}
+                      />
+                      <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: c.color }}></span>
+                      {c.name}
+                    </label>
+                  )
+                })}
               </div>
             </div>
 

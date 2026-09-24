@@ -4,7 +4,7 @@ import { apiFetch, formatDate } from './api.js'
 import DeleteModal from './DeleteModal.jsx'
 import RecurrenceBuilder from './RecurrenceBuilder.jsx'
 
-export default function EventItem({ event, theme, dateFormat, onDelete, onUpdate }) {
+export default function EventItem({ event, calendars = [], theme, dateFormat, onDelete, onUpdate }) {
   const [isEditing, setIsEditing] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [title, setTitle] = useState(event.title)
@@ -13,7 +13,6 @@ export default function EventItem({ event, theme, dateFormat, onDelete, onUpdate
   const [endTime, setEndTime] = useState(event.end_time || '')
   const [notes, setNotes] = useState(event.notes || '')
 
-  // Standardized Recurrence States for List Editing
   const [freq, setFreq] = useState('')
   const [interval, setInterval] = useState(1)
   const [endType, setEndType] = useState('never')
@@ -23,6 +22,10 @@ export default function EventItem({ event, theme, dateFormat, onDelete, onUpdate
   const [monthDay, setMonthDay] = useState(1)
 
   const isRecurring = event.is_recurring || Boolean(event.rrule)
+
+  const assignedCalendars = calendars.filter(
+    (c) => event.calendar_ids && event.calendar_ids.includes(c.id)
+  )
 
   const handleStartEdit = () => {
     const rruleStr = event.rrule || ''
@@ -182,6 +185,28 @@ export default function EventItem({ event, theme, dateFormat, onDelete, onUpdate
               <span>
                 <strong>{formatDate(event.date, dateFormat)}{formatTimeDisplay()}:</strong> {event.title}
               </span>
+              
+              {assignedCalendars.map((cal) => (
+                <span
+                  key={cal.id}
+                  style={{
+                    backgroundColor: `${cal.color}20`,
+                    color: cal.color,
+                    border: `1px solid ${cal.color}`,
+                    padding: '0.1rem 0.4rem',
+                    borderRadius: '4px',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.2rem'
+                  }}
+                >
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: cal.color, display: 'inline-block' }}></span>
+                  {cal.name}
+                </span>
+              ))}
+
               {event.is_recurring && (
                 <span
                   style={{
