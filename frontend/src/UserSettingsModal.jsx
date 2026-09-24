@@ -44,6 +44,10 @@ export default function UserSettingsModal({
   const [calMsg, setCalMsg] = useState({ text: '', isError: false })
   const [deleteCalTarget, setDeleteCalTarget] = useState(null)
 
+  // Calendar Sharing States
+  const [shareUsers, setShareUsers] = useState([])
+  const [selectedShareCalId, setSelectedShareCalId] = useState(null)
+
   useEffect(() => {
     if (currentUser) {
       setDisplayName(currentUser.display_name || currentUser.username || '')
@@ -66,6 +70,8 @@ export default function UserSettingsModal({
       setShowCleanupConfirm(false)
       setShowCreateCal(false)
       setDeleteCalTarget(null)
+      setSelectedShareCalId(null)
+      setShareUsers([])
     }
   }, [isOpen])
 
@@ -133,6 +139,43 @@ export default function UserSettingsModal({
     } catch (err) {
       setCalMsg({ text: 'Error deleting calendar', isError: true })
       setDeleteCalTarget(null)
+    }
+  }
+
+  const fetchShares = async (calId) => {
+    if (selectedShareCalId === calId) {
+      setSelectedShareCalId(null)
+      setShareUsers([])
+      return
+    }
+    try {
+      const res = await apiFetch(`/calendars/${calId}/shares`)
+      if (res.ok) {
+        const data = await res.json()
+        setShareUsers(data)
+        setSelectedShareCalId(calId)
+      }
+    } catch (err) {
+      console.error('Failed to fetch calendar shares', err)
+    }
+  }
+
+  const handleToggleShare = async (userId, hasAccess) => {
+    if (!selectedShareCalId) return
+    try {
+      const res = await apiFetch(`/calendars/${selectedShareCalId}/shares/toggle`, {
+        method: 'POST',
+        body: JSON.stringify({ user_id: userId, has_access: !hasAccess })
+      })
+      if (res.ok) {
+        setShareUsers((prevUsers) =>
+          prevUsers.map((u) =>
+            u.user_id === userId ? { ...u, has_access: !hasAccess } : u
+          )
+        )
+      }
+    } catch (err) {
+      console.error('Failed to toggle share', err)
     }
   }
 
@@ -271,7 +314,7 @@ export default function UserSettingsModal({
           color: themeColors.text,
           padding: '1.5rem',
           borderRadius: '8px',
-          maxWidth: '650px',
+          maxWidth: '850px',
           width: '100%',
           maxHeight: '85vh',
           overflowY: 'auto',
@@ -290,8 +333,8 @@ export default function UserSettingsModal({
 
         {/* Profile Section */}
         <form 
-          onSubmit={handleProfileSubmit} 
-          onChange={() => clearMessagesExcept('profile')}
+           onSubmit={handleProfileSubmit} 
+           onChange={() => clearMessagesExcept('profile')}
           style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}
         >
           <h3 style={{ margin: '0 0 0.75rem 0' }}>Profile</h3>
@@ -365,37 +408,75 @@ export default function UserSettingsModal({
             </form>
           )}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {calendars.map((cal) => (
               <div
                 key={cal.id}
                 style={{
                   display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
+                  flexDirection: 'column',
                   background: themeColors.bg,
-                  padding: '0.5rem 0.75rem',
+                  padding: '0.75rem',
                   borderRadius: '6px',
                   border: `1px solid ${themeColors.border}`
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: cal.color }}></span>
-                  <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{cal.name}</span>
-                  {cal.is_default && (
-                    <span style={{ fontSize: '0.75rem', background: themeColors.cardBg, color: themeColors.subText, padding: '0.1rem 0.4rem', borderRadius: '4px', border: `1px solid ${themeColors.border}` }}>
-                      Personal
-                    </span>
-                  )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: cal.color }}></span>
+                    <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{cal.name}</span>
+                    {cal.is_default && (
+                      <span style={{ fontSize: '0.75rem', background: themeColors.cardBg, color: themeColors.subText, padding: '0.1rem 0.4rem', borderRadius: '4px', border: `1px solid ${themeColors.border}` }}>
+                        Personal
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    {!cal.is_default && cal.is_owner && (
+                      <button
+                        type="button"
+                        onClick={() => fetchShares(cal.id)}
+                        style={{ background: themeColors.primary, color: 'white', border: 'none', borderRadius: '4px', padding: '0.25rem 0.6rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}
+                      >
+                        {selectedShareCalId === cal.id ? 'Close Sharing' : 'Share'}
+                      </button>
+                    )}
+                    {!cal.is_default && cal.is_owner && (
+                      <button
+                        type="button"
+                        onClick={() => setDeleteCalTarget(cal)}
+                        style={{ background: '#d32f2f', color: 'white', border: 'none', borderRadius: '4px', padding: '0.25rem 0.6rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
                 </div>
-                {!cal.is_default && cal.is_owner && (
-                  <button
-                    type="button"
-                    onClick={() => setDeleteCalTarget(cal)}
-                    style={{ background: '#d32f2f', color: 'white', border: 'none', borderRadius: '4px', padding: '0.25rem 0.6rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}
-                  >
-                    Delete
-                  </button>
+
+                {/* Sharing expansion list */}
+                {selectedShareCalId === cal.id && (
+                  <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: `1px dashed ${themeColors.border}` }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '0.4rem' }}>
+                      Share Calendar with Users:
+                    </span>
+                    {shareUsers.length === 0 ? (
+                      <p style={{ fontSize: '0.75rem', color: themeColors.subText, margin: 0 }}>No other users available to share with.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        {shareUsers.map((u) => (
+                          <label key={u.user_id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={u.has_access}
+                              onChange={() => handleToggleShare(u.user_id, u.has_access)}
+                            />
+                            {u.display_name} <span style={{ color: themeColors.subText }}>(@{u.username})</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             ))}
@@ -538,6 +619,7 @@ export default function UserSettingsModal({
               style={inputStyle}
             />
           </div>
+
           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'space-between', flexWrap: 'wrap' }}>
             <button
               type="submit"

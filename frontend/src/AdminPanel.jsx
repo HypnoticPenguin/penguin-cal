@@ -6,6 +6,11 @@ export default function AdminPanel({ currentUserId, theme }) {
   const [users, setUsers] = useState([])
   const [error, setError] = useState('')
   const [modalConfig, setModalConfig] = useState({ isOpen: false, title: '', message: '', action: null, color: '#4CAF50' })
+  
+  // Password Reset State
+  const [resetTargetUser, setResetTargetUser] = useState(null)
+  const [newAdminPassword, setNewAdminPassword] = useState('')
+  const [resetMsg, setResetMsg] = useState({ text: '', isError: false })
 
   const fetchUsers = async () => {
     try {
@@ -72,6 +77,42 @@ export default function AdminPanel({ currentUserId, theme }) {
         setModalConfig({ isOpen: false })
       }
     })
+  }
+
+  const handlePasswordResetSubmit = async (e) => {
+    e.preventDefault()
+    if (!resetTargetUser || !newAdminPassword) return
+    setResetMsg({ text: '', isError: false })
+
+    try {
+      const res = await apiFetch(`/admin/users/${resetTargetUser.id}/password`, {
+        method: 'PUT',
+        body: JSON.stringify({ new_password: newAdminPassword })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setResetMsg({ text: data.message || 'Password updated successfully!', isError: false })
+        setTimeout(() => {
+          setResetTargetUser(null)
+          setNewAdminPassword('')
+          setResetMsg({ text: '', isError: false })
+        }, 1500)
+      } else {
+        setResetMsg({ text: data.detail || 'Failed to reset password', isError: true })
+      }
+    } catch (err) {
+      setResetMsg({ text: 'Error connecting to server', isError: true })
+    }
+  }
+
+  const inputStyle = {
+    width: '100%',
+    padding: '0.5rem',
+    boxSizing: 'border-box',
+    background: theme.bg,
+    color: theme.text,
+    border: `1px solid ${theme.border}`,
+    borderRadius: '4px'
   }
 
   return (
@@ -192,6 +233,26 @@ export default function AdminPanel({ currentUserId, theme }) {
               </td>
               <td style={{ textAlign: 'right' }}>
                 <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => {
+                      setResetTargetUser(user)
+                      setNewAdminPassword('')
+                      setResetMsg({ text: '', isError: false })
+                    }}
+                    style={{
+                      background: '#ff9800',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '0.4rem 0.8rem',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: '0.85rem'
+                    }}
+                  >
+                    Reset Password
+                  </button>
+
                   {user.id !== currentUserId && (
                     <button
                       onClick={() => handleToggleAdminClick(user.id, user.username, user.is_admin)}
@@ -209,6 +270,7 @@ export default function AdminPanel({ currentUserId, theme }) {
                       {user.is_admin ? 'Revoke Admin' : 'Make Admin'}
                     </button>
                   )}
+
                   {user.id !== currentUserId && (
                     <button
                       onClick={() => handleDeleteUserClick(user.id, user.username)}
@@ -232,6 +294,76 @@ export default function AdminPanel({ currentUserId, theme }) {
           ))}
         </tbody>
       </table>
+
+      {/* Password Reset Sub-Modal */}
+      {resetTargetUser && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1200
+          }}
+        >
+          <div
+            style={{
+              background: theme.cardBg,
+              color: theme.text,
+              padding: '1.5rem',
+              borderRadius: '8px',
+              maxWidth: '380px',
+              width: '100%',
+              border: `1px solid ${theme.border}`,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              boxSizing: 'border-box'
+            }}
+          >
+            <h3 style={{ margin: '0 0 0.75rem 0', color: theme.primary }}>
+              Reset Password for {resetTargetUser.username}
+            </h3>
+            {resetMsg.text && (
+              <p style={{ color: resetMsg.isError ? '#ff5252' : '#66bb6a', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
+                {resetMsg.text}
+              </p>
+            )}
+            <form onSubmit={handlePasswordResetSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem', fontWeight: 'bold' }}>
+                  New Password (min 4 chars)
+                </label>
+                <input
+                  type="password"
+                  value={newAdminPassword}
+                  onChange={(e) => setNewAdminPassword(e.target.value)}
+                  required
+                  style={inputStyle}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setResetTargetUser(null)}
+                  style={{ padding: '0.4rem 0.8rem', background: '#888', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{ padding: '0.4rem 0.8rem', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+                >
+                  Save Password
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <ConfirmModal
         isOpen={modalConfig.isOpen}

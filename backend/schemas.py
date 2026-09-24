@@ -27,6 +27,9 @@ class ShareToggleRequest(BaseModel):
     user_id: int
     has_access: bool
 
+class AdminPasswordReset(BaseModel):
+    new_password: str
+
 class EventCreate(BaseModel):
     title: str
     date: str
