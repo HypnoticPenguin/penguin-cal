@@ -1,0 +1,50 @@
+from pydantic import BaseModel
+from typing import Optional, List
+
+class UserRegister(BaseModel):
+    username: str
+    display_name: Optional[str] = None
+    password: str
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    display_name: Optional[str] = None
+    is_admin: bool
+
+class ProfileUpdate(BaseModel):
+    display_name: str
+
+class CalendarCreate(BaseModel):
+    name: str
+    color: str = "#2196F3"
+
+class CalendarUpdate(BaseModel):
+    name: str
+    color: str = "#2196F3"
+
+class ShareToggleRequest(BaseModel):
+    user_id: int
+    has_access: bool
+
+class EventCreate(BaseModel):
+    title: str
+    date: str
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    notes: Optional[str] = None
+    calendar_ids: List[int]
+    rrule: Optional[str] = None
+
+class EventUpdate(BaseModel):
+    title: str
+    date: str
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    notes: Optional[str] = None
+    calendar_ids: Optional[List[int]] = None
+    rrule: Optional[str] = None
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"

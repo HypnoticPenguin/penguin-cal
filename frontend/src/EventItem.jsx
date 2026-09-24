@@ -4,7 +4,7 @@ import { apiFetch, formatDate } from './api.js'
 import DeleteModal from './DeleteModal.jsx'
 import RecurrenceBuilder from './RecurrenceBuilder.jsx'
 
-export default function EventItem({ event, calendars = [], theme, dateFormat, onDelete, onUpdate }) {
+export default function EventItem({ event, calendars = [], theme, dateFormat, onDelete, onUpdate, onGoToCalendar }) {
   const [isEditing, setIsEditing] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [title, setTitle] = useState(event.title)
@@ -240,6 +240,13 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
             </>
           ) : (
             <>
+              <button 
+                onClick={() => onGoToCalendar && onGoToCalendar(event.date)} 
+                title="View on Calendar"
+                style={{ background: '#607d8b', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', cursor: 'pointer', fontSize: '0.85rem' }}
+              >
+                View on Calendar
+              </button>
               <button onClick={handleStartEdit} style={{ background: '#2196F3', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', cursor: 'pointer', fontSize: '0.85rem' }}>Edit</button>
               <button onClick={handleDeleteClick} style={{ background: '#ff4d4d', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', cursor: 'pointer', fontSize: '0.85rem' }}>Delete</button>
             </>

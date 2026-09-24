@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { apiFetch } from './api.js'
 import { themes } from './themes.js'
 import pkg from '../package.json'
@@ -23,7 +23,8 @@ export default function App() {
   const [dateFormat, setDateFormat] = useState('YYYY-MM-DD')
   const [showPastEvents, setShowPastEvents] = useState(false)
   
-  // Default start date to today, and end date to 3 months in the future
+  const calendarRef = useRef(null)
+  
   const todayObj = new Date()
   const todayStr = todayObj.toISOString().slice(0, 10)
   
@@ -331,9 +332,11 @@ export default function App() {
         <EventForm calendars={calendars} theme={currentTheme} onEventAdded={fetchEvents} defaultDate={selectedDate} />
 
         <CalendarView
+          calendarRef={calendarRef}
           events={visibleEvents}
           themeColors={currentTheme}
           dateFormat={dateFormat}
+          highlightedDate={selectedDate}
           onDateSelect={(dateStr) => setSelectedDate(dateStr)}
           onEventClick={(evt) => setModalEvent(evt)}
         />
@@ -387,6 +390,14 @@ export default function App() {
                 calendars={calendars}
                 theme={currentTheme}
                 dateFormat={dateFormat}
+                onGoToCalendar={(dateStr) => {
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                  setSelectedDate(dateStr)
+                  if (calendarRef.current) {
+                    const calendarApi = calendarRef.current.getApi()
+                    calendarApi.gotoDate(dateStr)
+                  }
+                }}
                 onDelete={async (id, type, date) => {
                   let url = `/events/${id}?delete_type=${type}`
                   if (date) url += `&instance_date=${date}`

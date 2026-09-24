@@ -1,193 +1,165 @@
-import FullCalendar from '@fullcalendar/react' 
-import dayGridPlugin from '@fullcalendar/daygrid' 
-import timeGridPlugin from '@fullcalendar/timegrid' 
-import interactionPlugin from '@fullcalendar/interaction' 
-import rrulePlugin from '@fullcalendar/rrule' 
-import { RRule } from 'rrule'
-import { formatDate } from './api.js'
+import { useRef } from 'react'
+import FullCalendar from '@fullcalendar/react'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import timeGridPlugin from '@fullcalendar/timegrid'
+import interactionPlugin from '@fullcalendar/interaction'
 
-export default function CalendarView({ events, themeColors, dateFormat, onDateSelect, onEventClick }) {
-  const parseRrule = (rruleStr, dtstart) => {
-    if (!rruleStr) return null
-    const parts = rruleStr.split(';').reduce((acc, part) => {
-      const [key, val] = part.split('=')
-      acc[key] = val
-      return acc
-    }, {})
-    const ruleObj = {
-      freq: parts.FREQ ? parts.FREQ.toLowerCase() : 'weekly',
-      dtstart: dtstart,
-    }
-    if (parts.BYDAY) ruleObj.byweekday = parts.BYDAY.split(',').map((d) => d.toLowerCase())
-    if (parts.BYMONTHDAY) ruleObj.bymonthday = parts.BYMONTHDAY.split(',').map(Number)
-    return ruleObj
+export default function CalendarView({ events, themeColors, dateFormat, onDateSelect, onEventClick, calendarRef, highlightedDate }) {
+  const internalCalendarRef = useRef(null)
+  const activeRef = calendarRef || internalCalendarRef
+
+  const handleDateClick = (arg) => {
+    if (onDateSelect) onDateSelect(arg.dateStr)
   }
 
-  const formattedEvents = events.map((evt) => {
-    const baseEvent = {
+  const handleEventClick = (info) => {
+    const rawEvent = info.event.extendedProps.rawEvent
+    if (onEventClick) onEventClick(rawEvent)
+  }
+
+  const fcEvents = events.map((evt) => {
+    const startDateTime = evt.start_time ? `${evt.date}T${evt.start_time}` : evt.date
+    const endDateTime = evt.end_time ? `${evt.date}T${evt.end_time}` : undefined
+
+    let calendarColor = '#2196F3'
+    if (evt.calendar && evt.calendar.color) {
+      calendarColor = evt.calendar.color
+    }
+
+    return {
       id: String(evt.id),
       title: evt.title,
-      backgroundColor: evt.color || themeColors.primary,
-      borderColor: evt.color || themeColors.primary,
-      extendedProps: { rawEvent: evt }
-    }
-    const startTimeVal = evt.start_time || evt.time
-    const startDateTime = startTimeVal ? `${evt.date}T${startTimeVal}:00` : evt.date
-    const endDateTime = evt.end_time ? `${evt.date}T${evt.end_time}:00` : undefined
-    if (evt.rrule) {
-      return {
-        ...baseEvent,
-        rrule: parseRrule(evt.rrule, startDateTime),
-        exdate: evt.exdates || []
-      }
-    }
-    return {
-      ...baseEvent,
       start: startDateTime,
       end: endDateTime,
-      allDay: !startTimeVal
+      allDay: !evt.start_time && !evt.end_time,
+      backgroundColor: calendarColor,
+      borderColor: calendarColor,
+      textColor: '#ffffff',
+      extendedProps: {
+        rawEvent: evt
+      }
     }
   })
 
-  const getEventTooltipText = (rawEvt) => {
-    if (!rawEvt.rrule) return rawEvt.title
-
-    if (!rawEvt.rrule.includes('UNTIL=') && !rawEvt.rrule.includes('COUNT=')) {
-      return `${rawEvt.title} (Repeats indefinitely)`
-    }
-
-    try {
-      const startTimeVal = rawEvt.start_time || rawEvt.time
-      const dtstart = new Date(startTimeVal ? `${rawEvt.date}T${startTimeVal}:00` : `${rawEvt.date}T00:00:00`)
-      const rule = RRule.fromString(`DTSTART:${dtstart.toISOString().replace(/[-:]/g, '').split('.')[0]}Z\nRRULE:${rawEvt.rrule}`)
-      const allDates = rule.all()
-
-      if (allDates.length > 0) {
-        const lastDate = allDates[allDates.length - 1]
-        const year = lastDate.getUTCFullYear()
-        const month = String(lastDate.getUTCMonth() + 1).padStart(2, '0')
-        const day = String(lastDate.getUTCDate()).padStart(2, '0')
-        const formattedEndDate = formatDate(`${year}-${month}-${day}`, dateFormat)
-        return `${rawEvt.title} (Ends on ${formattedEndDate})`
-      }
-    } catch (err) {
-      console.error('Failed to parse grid recurrence end date:', err)
-    }
-
-    return `${rawEvt.title} (Repeats indefinitely)`
+  if (highlightedDate) {
+    fcEvents.push({
+      id: 'highlight-date',
+      start: highlightedDate,
+      allDay: true,
+      display: 'background',
+      backgroundColor: `${themeColors.primary}35`
+    })
   }
 
   return (
     <div
       style={{
-        marginTop: '1.5rem',
         background: themeColors.cardBg,
         color: themeColors.text,
         padding: '1rem',
         borderRadius: '8px',
         border: `1px solid ${themeColors.border}`,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-        transition: 'all 0.3s ease'
+        boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+        transition: 'all 0.3s ease',
+        boxSizing: 'border-box'
       }}
     >
       <style>{`
-        div.fc {
+        /* Comprehensive FullCalendar Theme Overrides for Header & Body Readability */
+        .fc {
           color: ${themeColors.text} !important;
           background-color: ${themeColors.cardBg} !important;
         }
-        div.fc .fc-theme-standard td, 
-        div.fc .fc-theme-standard th,
-        div.fc .fc-scrollgrid {
-          border-color: ${themeColors.border} !important;
-        }
-        div.fc .fc-toolbar-title {
+
+        /* Toolbar Header Title (Month/Year) */
+        .fc .fc-toolbar-title {
           color: ${themeColors.text} !important;
         }
-        div.fc .fc-button-primary {
+
+        /* Day of week column headers (Mon, Tue, Wed...) and wrapper header row background */
+        .fc .fc-col-header,
+        .fc .fc-col-header-cell,
+        .fc .fc-scrollgrid-section-header td,
+        .fc .fc-scrollgrid-section-header th {
+          background-color: ${themeColors.cardBg} !important;
+          border-color: ${themeColors.border} !important;
+        }
+
+        .fc .fc-col-header-cell-cushion {
+          color: ${themeColors.text} !important;
+          font-weight: bold !important;
+          text-decoration: none !important;
+          display: block;
+          padding: 8px 4px;
+        }
+
+        /* Calendar grid day numbers */
+        .fc .fc-daygrid-day-number,
+        .fc .fc-timegrid-slot-label-cushion,
+        .fc .fc-timegrid-axis-cushion {
+          color: ${themeColors.text} !important;
+          text-decoration: none !important;
+        }
+
+        /* Background grid styling for days/slots */
+        .fc .fc-daygrid-day,
+        .fc .fc-timegrid-slot,
+        .fc .fc-timegrid-axis {
+          background-color: transparent !important;
+          border-color: ${themeColors.border} !important;
+        }
+
+        /* Toolbar Navigation & View Buttons */
+        .fc .fc-button-primary {
           background-color: ${themeColors.primary} !important;
           border-color: ${themeColors.primary} !important;
           color: #ffffff !important;
+          font-weight: bold;
         }
-        div.fc .fc-col-header-cell {
-          background-color: ${themeColors.accentBg || themeColors.cardBg} !important;
+        .fc .fc-button-primary:hover {
+          opacity: 0.9 !important;
         }
-        div.fc .fc-col-header-cell-cushion,
-        div.fc a.fc-col-header-cell-cushion {
-          color: ${themeColors.text} !important;
-          font-weight: bold !important;
-          text-decoration: none !important;
+        .fc .fc-button-primary:disabled {
+          background-color: #888888 !important;
+          border-color: #888888 !important;
         }
-        div.fc .fc-daygrid-day-number,
-        div.fc a.fc-daygrid-day-number,
-        div.fc .fc-timegrid-slot-label-cushion,
-        div.fc .fc-timegrid-axis-cushion {
-          color: ${themeColors.text} !important;
-          text-decoration: none !important;
+        .fc .fc-button-active {
+          filter: brightness(0.85);
         }
-        div.fc .fc-timegrid-slot,
-        div.fc .fc-timegrid-slot-label,
-        div.fc .fc-daygrid-day {
-          background-color: ${themeColors.cardBg} !important;
+
+        /* All Borders & Scrollgrid Layout Lines */
+        .fc th, .fc td, .fc hr, .fc .fc-scrollgrid, .fc-theme-standard td, .fc-theme-standard th {
+          border-color: ${themeColors.border} !important;
         }
-        div.fc .fc-day-today {
-          background-color: ${themeColors.accentBg || 'rgba(33, 150, 243, 0.12)'} !important;
+
+        /* Today Highlight cell */
+        .fc .fc-day-today {
+          background-color: ${themeColors.primary}20 !important;
         }
-        div.fc .fc-highlight {
-          background-color: ${themeColors.primary} !important;
-          opacity: 0.3 !important;
-        }
-        div.fc .fc-event {
-          white-space: normal !important;
-          padding: 2px 4px !important;
-          font-size: 0.85rem !important;
-        }
-        div.fc .fc-event-title {
-          font-weight: bold !important;
+
+        /* Other months muted look */
+        .fc .fc-day-other .fc-daygrid-day-number {
+          opacity: 0.5;
+          color: ${themeColors.subText} !important;
         }
       `}</style>
+
       <FullCalendar
-        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, rrulePlugin]}
+        ref={activeRef}
+        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView="dayGridMonth"
         headerToolbar={{
           left: 'prev,next today',
           center: 'title',
-          right: 'timeGridDay,timeGridWeek,dayGridMonth'
+          right: 'dayGridMonth,timeGridWeek,timeGridDay'
         }}
-        events={formattedEvents}
-        eventDisplay="block"
+        events={fcEvents}
+        editable={false}
         selectable={true}
-        dayMaxEvents={false}
-        eventTimeFormat={{
-          hour: 'numeric',
-          minute: '2-digit',
-          meridiem: 'short'
-        }}
-        eventDidMount={(info) => {
-          const rawEvent = info.event.extendedProps.rawEvent
-          if (rawEvent) {
-            info.el.title = getEventTooltipText(rawEvent)
-          }
-        }}
-        dateClick={(info) => {
-          const calendarApi = info.view.calendar
-          calendarApi.changeView('timeGridDay', info.dateStr)
-          if (onDateSelect) {
-            onDateSelect(info.dateStr.slice(0, 10))
-          }
-        }}
-        select={(selectInfo) => onDateSelect && onDateSelect(selectInfo.startStr.slice(0, 10))}
-        eventClick={(clickInfo) => {
-          const rawEvent = clickInfo.event.extendedProps.rawEvent
-          const isRecurring = Boolean(rawEvent.rrule)
-          const eventForModal = {
-            ...rawEvent,
-            // Preserve master start date for recurring series, otherwise use clicked instance date
-            date: isRecurring ? rawEvent.date : (clickInfo.event.startStr ? clickInfo.event.startStr.slice(0, 10) : rawEvent.date)
-          }
-          if (onEventClick) {
-            onEventClick(eventForModal)
-          }
-        }}
+        selectMirror={true}
+        dayMaxEvents={true}
+        dateClick={handleDateClick}
+        eventClick={handleEventClick}
         height="auto"
       />
     </div>
