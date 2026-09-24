@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { apiFetch } from './api.js'
+import { RRule } from 'rrule'
+import { apiFetch, formatDate } from './api.js'
 import DeleteModal from './DeleteModal.jsx'
 
-export default function EventItem({ event, onDelete, onUpdate }) {
+export default function EventItem({ event, dateFormat, onDelete, onUpdate }) {
   const [isEditing, setIsEditing] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [title, setTitle] = useState(event.title)
@@ -50,6 +51,34 @@ export default function EventItem({ event, onDelete, onUpdate }) {
     return ` @ ${s}`
   }
 
+  const getRecurrenceText = () => {
+    if (!event.rrule) return 'Recurring'
+
+    if (!event.rrule.includes('UNTIL=') && !event.rrule.includes('COUNT=')) {
+      return 'Repeats indefinitely'
+    }
+
+    try {
+      const startTimeVal = event.start_time || event.time
+      const dtstart = new Date(startTimeVal ? `${event.date}T${startTimeVal}:00` : `${event.date}T00:00:00`)
+      const rule = RRule.fromString(`DTSTART:${dtstart.toISOString().replace(/[-:]/g, '').split('.')[0]}Z\nRRULE:${event.rrule}`)
+      const allDates = rule.all()
+      
+      if (allDates.length > 0) {
+        const lastDate = allDates[allDates.length - 1]
+        const year = lastDate.getUTCFullYear()
+        const month = String(lastDate.getUTCMonth() + 1).padStart(2, '0')
+        const day = String(lastDate.getUTCDate()).padStart(2, '0')
+        const formattedEndDate = formatDate(`${year}-${month}-${day}`, dateFormat)
+        return `Ends on ${formattedEndDate}`
+      }
+    } catch (err) {
+      console.error('Failed to parse recurrence end date:', err)
+    }
+
+    return 'Repeats indefinitely'
+  }
+
   return (
     <>
       <li style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0', borderBottom: '1px solid #ccc' }}>
@@ -68,11 +97,27 @@ export default function EventItem({ event, onDelete, onUpdate }) {
             </select>
           </div>
         ) : (
-          <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             <span>
-              <strong>{event.date}{formatTimeDisplay()}:</strong> {event.title}
+              <strong>{formatDate(event.date, dateFormat)}{formatTimeDisplay()}:</strong> {event.title}
             </span>
-            {event.rrule && <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: '#666' }}>({event.rrule})</span>}
+            {event.is_recurring && (
+              <span
+                style={{
+                  background: 'rgba(33, 150, 243, 0.15)',
+                  color: '#2196F3',
+                  padding: '0.1rem 0.4rem',
+                  borderRadius: '4px',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.2rem'
+                }}
+              >
+                Recurring ({getRecurrenceText()})
+              </span>
+            )}
           </div>
         )}
         <div style={{ display: 'flex', gap: '0.5rem' }}>

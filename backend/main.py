@@ -188,7 +188,7 @@ def register_user(user_data: UserRegister, session: Session = Depends(get_sessio
     existing = session.exec(select(User).where(User.username == user_data.username)).first()
     if existing:
         raise HTTPException(status_code=400, detail="Username already registered")
-    
+        
     user_count = len(session.exec(select(User)).all())
     is_first_user = (user_count == 0)
     
@@ -244,7 +244,7 @@ def update_profile(
     clean_name = profile_data.display_name.strip()
     if not clean_name:
         raise HTTPException(status_code=400, detail="Display name cannot be empty")
-    
+        
     current_user.display_name = clean_name
     session.add(current_user)
     session.commit()
@@ -268,10 +268,10 @@ def change_password(
     
     if not verify_password(curr_pw, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect current password")
-    
+        
     if not new_pw or len(new_pw) < 4:
         raise HTTPException(status_code=400, detail="New password must be at least 4 characters long")
-    
+        
     current_user.hashed_password = hash_password(new_pw)
     session.add(current_user)
     session.commit()
@@ -354,7 +354,7 @@ def get_calendar_shares(
         raise HTTPException(status_code=403, detail="Only calendar owners can view share status")
     if cal.is_default:
         raise HTTPException(status_code=400, detail="Personal default calendar cannot be shared")
-    
+        
     all_users = session.exec(select(User).where(User.id != current_user.id)).all()
     existing_shares = session.exec(select(CalendarShare).where(CalendarShare.calendar_id == calendar_id)).all()
     shared_user_ids = {s.shared_with_user_id for s in existing_shares}
@@ -381,7 +381,7 @@ def toggle_calendar_share(
         raise HTTPException(status_code=403, detail="Only calendar owners can manage shares")
     if cal.is_default:
         raise HTTPException(status_code=400, detail="Personal default calendar cannot be shared")
-    
+        
     existing_share = session.exec(
         select(CalendarShare).where(
             CalendarShare.calendar_id == calendar_id,
@@ -396,7 +396,7 @@ def toggle_calendar_share(
     elif not share_req.has_access and existing_share:
         session.delete(existing_share)
         session.commit()
-    
+        
     return {"status": "ok"}
 
 # ------------------------------------------------------------------
@@ -404,8 +404,6 @@ def toggle_calendar_share(
 # ------------------------------------------------------------------
 @app.get("/api/events")
 def get_events(
-    start: Optional[str] = Query(None),
-    end: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
@@ -415,19 +413,19 @@ def get_events(
     
     if not allowed_ids:
         return []
-    
+        
     cal_map = {c.id: c for c in session.exec(select(Calendar).where(Calendar.id.in_(allowed_ids))).all()}
     links = session.exec(select(EventCalendarLink).where(EventCalendarLink.calendar_id.in_(allowed_ids))).all()
     
     if not links:
         return []
-    
+        
     event_cal_map = {}
     for link in links:
         if link.event_id not in event_cal_map:
             event_cal_map[link.event_id] = []
         event_cal_map[link.event_id].append(link.calendar_id)
-    
+        
     event_ids = list(event_cal_map.keys())
     user_events = session.exec(select(Event).where(Event.id.in_(event_ids))).all()
     
@@ -438,54 +436,19 @@ def get_events(
         color = primary_cal.color if primary_cal else "#2196F3"
         exdates_list = [x.strip() for x in event.exdates.split(",")] if event.exdates else []
         
-        if not start or not end or not event.rrule:
-            output.append({
-                "id": event.id,
-                "title": event.title,
-                "date": event.date,
-                "start_time": event.start_time,
-                "end_time": event.end_time,
-                "rrule": event.rrule,
-                "exdates": exdates_list,
-                "calendar_ids": cal_ids,
-                "color": color,
-                "is_recurring": bool(event.rrule)
-            })
-        else:
-            try:
-                range_start = datetime.fromisoformat(start[:10])
-                range_end = datetime.fromisoformat(end[:10])
-                rule_str = f"DTSTART:{event.date.replace('-', '')}\nRRULE:{event.rrule}"
-                rule = rrule.rrulestr(rule_str)
-                occurrences = rule.between(range_start, range_end, inc=True)
-                for occ in occurrences:
-                    occ_str = occ.strftime("%Y-%m-%d")
-                    if occ_str not in exdates_list:
-                        output.append({
-                            "id": event.id,
-                            "title": event.title,
-                            "date": occ_str,
-                            "start_time": event.start_time,
-                            "end_time": event.end_time,
-                            "rrule": event.rrule,
-                            "exdates": exdates_list,
-                            "calendar_ids": cal_ids,
-                            "color": color,
-                            "is_recurring": True
-                        })
-            except Exception:
-                output.append({
-                    "id": event.id,
-                    "title": event.title,
-                    "date": event.date,
-                    "start_time": event.start_time,
-                    "end_time": event.end_time,
-                    "rrule": event.rrule,
-                    "exdates": exdates_list,
-                    "calendar_ids": cal_ids,
-                    "color": color,
-                    "is_recurring": True
-                })
+        output.append({
+            "id": event.id,
+            "title": event.title,
+            "date": event.date,
+            "start_time": event.start_time,
+            "end_time": event.end_time,
+            "rrule": event.rrule,
+            "exdates": exdates_list,
+            "calendar_ids": cal_ids,
+            "color": color,
+            "is_recurring": bool(event.rrule)
+        })
+            
     return output
 
 @app.post("/api/events")
@@ -496,7 +459,7 @@ def create_event(
 ):
     if not event_data.calendar_ids:
         raise HTTPException(status_code=400, detail="At least one calendar must be selected")
-    
+        
     db_event = Event(
         title=event_data.title,
         date=event_data.date,
@@ -526,7 +489,7 @@ def update_event(
     event = session.get(Event, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    
+        
     event.title = updated_event.title
     event.date = updated_event.date
     event.start_time = updated_event.start_time if updated_event.start_time else None
@@ -559,7 +522,7 @@ def delete_event(
     event = session.get(Event, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    
+        
     if delete_type == "single" and instance_date:
         formatted_date = instance_date[:10]
         exdates_list = [x.strip() for x in event.exdates.split(",")] if event.exdates else []
@@ -587,10 +550,8 @@ def import_ics_events(
     cal = session.get(Calendar, calendar_id)
     if not cal:
         raise HTTPException(status_code=404, detail="Calendar not found")
-
     content = file.file.read()
     gcal = ICalCalendar.from_ical(content)
-
     imported_count = 0
     for component in gcal.walk():
         if component.name == "VEVENT":
@@ -600,7 +561,7 @@ def import_ics_events(
             
             if not start:
                 continue
-            
+                
             start_dt = start.dt
             if hasattr(start_dt, 'strftime'):
                 date_str = start_dt.strftime("%Y-%m-%d")
@@ -608,13 +569,13 @@ def import_ics_events(
             else:
                 date_str = str(start_dt)
                 time_str = None
-
+                
             end_time_str = None
             if end:
                 end_dt = end.dt
                 if hasattr(end_dt, 'strftime') and hasattr(end_dt, 'hour'):
                     end_time_str = end_dt.strftime("%H:%M")
-
+                    
             db_event = Event(
                 title=title,
                 date=date_str,
@@ -625,12 +586,10 @@ def import_ics_events(
             session.add(db_event)
             session.commit()
             session.refresh(db_event)
-
             link = EventCalendarLink(event_id=db_event.id, calendar_id=calendar_id)
             session.add(link)
             session.commit()
             imported_count += 1
-
     return {"message": f"Successfully imported {imported_count} events."}
 
 @app.delete("/api/events/cleanup-past")
@@ -643,16 +602,15 @@ def cleanup_past_events(
     
     if not owned_cal_ids:
         return {"deleted_count": 0, "message": "No owned calendars found."}
-
+        
     links = session.exec(select(EventCalendarLink).where(EventCalendarLink.calendar_id.in_(owned_cal_ids))).all()
     event_ids = list(set([l.event_id for l in links]))
     
     if not event_ids:
         return {"deleted_count": 0, "message": "No events found to clean up."}
-
+        
     today_str = datetime.utcnow().strftime("%Y-%m-%d")
     user_events = session.exec(select(Event).where(Event.id.in_(event_ids))).all()
-
     deleted_count = 0
     for event in user_events:
         if not event.rrule and event.date < today_str:
@@ -661,7 +619,6 @@ def cleanup_past_events(
                 session.delete(link)
             session.delete(event)
             deleted_count += 1
-
     session.commit()
     return {"deleted_count": deleted_count, "message": f"Successfully deleted {deleted_count} past non-recurring events."}
 

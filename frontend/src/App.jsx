@@ -20,15 +20,18 @@ export default function App() {
   const [modalEvent, setModalEvent] = useState(null)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [themeKey, setThemeKey] = useState('light')
-
+  const [dateFormat, setDateFormat] = useState('YYYY-MM-DD')
   const currentTheme = themes[themeKey] || themes.light
 
   useEffect(() => {
     if (currentUser) {
       const userSavedTheme = localStorage.getItem(`theme_${currentUser.id}`) || 'light'
+      const userSavedFormat = localStorage.getItem(`dateFormat_${currentUser.id}`) || 'YYYY-MM-DD'
       setThemeKey(userSavedTheme)
+      setDateFormat(userSavedFormat)
     } else {
       setThemeKey('light')
+      setDateFormat('YYYY-MM-DD')
     }
   }, [currentUser])
 
@@ -36,6 +39,13 @@ export default function App() {
     setThemeKey(newTheme)
     if (currentUser) {
       localStorage.setItem(`theme_${currentUser.id}`, newTheme)
+    }
+  }
+
+  const handleDateFormatChange = (newFormat) => {
+    setDateFormat(newFormat)
+    if (currentUser) {
+      localStorage.setItem(`dateFormat_${currentUser.id}`, newFormat)
     }
   }
 
@@ -109,6 +119,7 @@ export default function App() {
     setCalendars([])
     setActiveCalendarIds([])
     setThemeKey('light')
+    setDateFormat('YYYY-MM-DD')
   }
 
   if (!token) {
@@ -155,7 +166,39 @@ export default function App() {
         boxSizing: 'border-box'
       }}
     >
+      {/* Global CSS Injector for Mobile Responsive Layouts */}
+      <style>{`
+        @media (max-width: 768px) {
+          .app-container {
+            padding: 0.75rem !important;
+          }
+          .header-row {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 0.75rem !important;
+          }
+          .header-actions {
+            width: 100%;
+            justify-content: space-between;
+          }
+          .fc .fc-toolbar {
+            flex-direction: column;
+            gap: 0.5rem;
+          }
+          .event-item-row {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 0.5rem;
+          }
+          .event-item-actions {
+            width: 100%;
+            justify-content: flex-end;
+          }
+        }
+      `}</style>
+
       <div
+        className="app-container"
         style={{
           padding: '2rem',
           maxWidth: '1200px',
@@ -165,17 +208,17 @@ export default function App() {
           boxSizing: 'border-box'
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <div className="header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <img
               src="/penguin-logo.svg"
               alt="Penguin Cal Logo"
               style={{ width: '40px', height: '40px', objectFit: 'contain' }}
             />
-            <h1 style={{ margin: 0 }}>Penguin Cal</h1>
+            <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Penguin Cal</h1>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span>
+          <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.9rem' }}>
               Logged in as: <strong>{currentUser?.display_name || currentUser?.username}</strong>
               {currentUser?.is_admin && (
                 <span style={{ marginLeft: '0.5rem', color: '#e65100', fontWeight: 'bold' }}>(Admin)</span>
@@ -214,6 +257,7 @@ export default function App() {
         <CalendarView
           events={visibleEvents}
           themeColors={currentTheme}
+          dateFormat={dateFormat}
           onDateSelect={(dateStr) => setSelectedDate(dateStr)}
           onEventClick={(evt) => setModalEvent(evt)}
         />
@@ -226,6 +270,7 @@ export default function App() {
                 key={`${evt.id}-${evt.date}`}
                 event={evt}
                 theme={currentTheme}
+                dateFormat={dateFormat}
                 onDelete={async (id, type, date) => {
                   let url = `/events/${id}?delete_type=${type}`
                   if (date) url += `&instance_date=${date}`
@@ -269,7 +314,10 @@ export default function App() {
           currentUser={currentUser}
           currentTheme={themeKey}
           themeColors={currentTheme}
+          dateFormat={dateFormat}
+          calendars={calendars}
           onThemeChange={handleThemeChange}
+          onDateFormatChange={handleDateFormatChange}
           onUserUpdated={fetchUser}
           onEventsChanged={fetchEvents}
         />

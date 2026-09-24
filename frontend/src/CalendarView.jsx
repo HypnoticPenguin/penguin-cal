@@ -3,8 +3,10 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid' 
 import interactionPlugin from '@fullcalendar/interaction' 
 import rrulePlugin from '@fullcalendar/rrule' 
+import { RRule } from 'rrule'
+import { formatDate } from './api.js'
 
-export default function CalendarView({ events, themeColors, onDateSelect, onEventClick }) {
+export default function CalendarView({ events, themeColors, dateFormat, onDateSelect, onEventClick }) {
   const parseRrule = (rruleStr, dtstart) => {
     if (!rruleStr) return null
     const parts = rruleStr.split(';').reduce((acc, part) => {
@@ -29,11 +31,9 @@ export default function CalendarView({ events, themeColors, onDateSelect, onEven
       borderColor: evt.color || themeColors.primary,
       extendedProps: { rawEvent: evt }
     }
-
     const startTimeVal = evt.start_time || evt.time
     const startDateTime = startTimeVal ? `${evt.date}T${startTimeVal}:00` : evt.date
     const endDateTime = evt.end_time ? `${evt.date}T${evt.end_time}:00` : undefined
-
     if (evt.rrule) {
       return {
         ...baseEvent,
@@ -41,7 +41,6 @@ export default function CalendarView({ events, themeColors, onDateSelect, onEven
         exdate: evt.exdates || []
       }
     }
-
     return {
       ...baseEvent,
       start: startDateTime,
@@ -49,6 +48,34 @@ export default function CalendarView({ events, themeColors, onDateSelect, onEven
       allDay: !startTimeVal
     }
   })
+
+  const getEventTooltipText = (rawEvt) => {
+    if (!rawEvt.rrule) return rawEvt.title
+
+    if (!rawEvt.rrule.includes('UNTIL=') && !rawEvt.rrule.includes('COUNT=')) {
+      return `${rawEvt.title} (Repeats indefinitely)`
+    }
+
+    try {
+      const startTimeVal = rawEvt.start_time || rawEvt.time
+      const dtstart = new Date(startTimeVal ? `${rawEvt.date}T${startTimeVal}:00` : `${rawEvt.date}T00:00:00`)
+      const rule = RRule.fromString(`DTSTART:${dtstart.toISOString().replace(/[-:]/g, '').split('.')[0]}Z\nRRULE:${rawEvt.rrule}`)
+      const allDates = rule.all()
+
+      if (allDates.length > 0) {
+        const lastDate = allDates[allDates.length - 1]
+        const year = lastDate.getUTCFullYear()
+        const month = String(lastDate.getUTCMonth() + 1).padStart(2, '0')
+        const day = String(lastDate.getUTCDate()).padStart(2, '0')
+        const formattedEndDate = formatDate(`${year}-${month}-${day}`, dateFormat)
+        return `${rawEvt.title} (Ends on ${formattedEndDate})`
+      }
+    } catch (err) {
+      console.error('Failed to parse grid recurrence end date:', err)
+    }
+
+    return `${rawEvt.title} (Repeats indefinitely)`
+  }
 
   return (
     <div
@@ -68,13 +95,11 @@ export default function CalendarView({ events, themeColors, onDateSelect, onEven
           color: ${themeColors.text} !important;
           background-color: ${themeColors.cardBg} !important;
         }
-
         div.fc .fc-theme-standard td, 
         div.fc .fc-theme-standard th,
         div.fc .fc-scrollgrid {
           border-color: ${themeColors.border} !important;
         }
-
         div.fc .fc-toolbar-title {
           color: ${themeColors.text} !important;
         }
@@ -83,7 +108,6 @@ export default function CalendarView({ events, themeColors, onDateSelect, onEven
           border-color: ${themeColors.primary} !important;
           color: #ffffff !important;
         }
-
         div.fc .fc-col-header-cell {
           background-color: ${themeColors.accentBg || themeColors.cardBg} !important;
         }
@@ -93,7 +117,6 @@ export default function CalendarView({ events, themeColors, onDateSelect, onEven
           font-weight: bold !important;
           text-decoration: none !important;
         }
-
         div.fc .fc-daygrid-day-number,
         div.fc a.fc-daygrid-day-number,
         div.fc .fc-timegrid-slot-label-cushion,
@@ -101,22 +124,18 @@ export default function CalendarView({ events, themeColors, onDateSelect, onEven
           color: ${themeColors.text} !important;
           text-decoration: none !important;
         }
-
         div.fc .fc-timegrid-slot,
         div.fc .fc-timegrid-slot-label,
         div.fc .fc-daygrid-day {
           background-color: ${themeColors.cardBg} !important;
         }
-
         div.fc .fc-day-today {
           background-color: ${themeColors.accentBg || 'rgba(33, 150, 243, 0.12)'} !important;
         }
-
         div.fc .fc-highlight {
           background-color: ${themeColors.primary} !important;
           opacity: 0.3 !important;
         }
-
         div.fc .fc-event {
           white-space: normal !important;
           padding: 2px 4px !important;
@@ -142,6 +161,12 @@ export default function CalendarView({ events, themeColors, onDateSelect, onEven
           hour: 'numeric',
           minute: '2-digit',
           meridiem: 'short'
+        }}
+        eventDidMount={(info) => {
+          const rawEvent = info.event.extendedProps.rawEvent
+          if (rawEvent) {
+            info.el.title = getEventTooltipText(rawEvent)
+          }
         }}
         dateClick={(info) => {
           const calendarApi = info.view.calendar

@@ -7,7 +7,13 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
   const [selectedCalIds, setSelectedCalIds] = useState([])
+  
+  // Advanced Recurrence States
   const [freq, setFreq] = useState('')
+  const [interval, setInterval] = useState(1)
+  const [endType, setEndType] = useState('never') // 'never', 'until', 'count'
+  const [untilDate, setUntilDate] = useState('')
+  const [count, setCount] = useState(10)
   const [selectedDays, setSelectedDays] = useState([])
   const [monthDay, setMonthDay] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -60,14 +66,11 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
       setEndTime('')
       return
     }
-
     const start = startTime || '09:00'
     if (!startTime) setStartTime('09:00')
-
     const [h, m] = start.split(':').map(Number)
     const end = new Date()
     end.setHours(h, m + minutes, 0, 0)
-
     const endH = String(end.getHours()).padStart(2, '0')
     const endM = String(end.getMinutes()).padStart(2, '0')
     setEndTime(`${endH}:${endM}`)
@@ -75,14 +78,23 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
 
   const buildRruleString = () => {
     if (!freq) return null
-    if (freq === 'DAILY') return 'FREQ=DAILY'
-    if (freq === 'WEEKLY') {
-      if (selectedDays.length === 0) return 'FREQ=WEEKLY'
-      return `FREQ=WEEKLY;BYDAY=${selectedDays.join(',')}`
+    let parts = [`FREQ=${freq}`]
+    if (interval && interval > 1) {
+      parts.push(`INTERVAL=${interval}`)
     }
-    if (freq === 'MONTHLY') return `FREQ=MONTHLY;BYMONTHDAY=${monthDay}`
-    if (freq === 'YEARLY') return 'FREQ=YEARLY'
-    return null
+    if (freq === 'WEEKLY' && selectedDays.length > 0) {
+      parts.push(`BYDAY=${selectedDays.join(',')}`)
+    }
+    if (freq === 'MONTHLY') {
+      parts.push(`BYMONTHDAY=${monthDay}`)
+    }
+    if (endType === 'until' && untilDate) {
+      const formattedUntil = untilDate.replace(/-/g, '') + 'T235959Z'
+      parts.push(`UNTIL=${formattedUntil}`)
+    } else if (endType === 'count' && count > 0) {
+      parts.push(`COUNT=${count}`)
+    }
+    return parts.join(';')
   }
 
   const handleSubmit = async (e) => {
@@ -109,6 +121,10 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
         setStartTime('')
         setEndTime('')
         setFreq('')
+        setInterval(1)
+        setEndType('never')
+        setUntilDate('')
+        setCount(10)
         setSelectedDays([])
       }
     } catch (error) {
@@ -123,7 +139,8 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
     background: theme.cardBg,
     color: theme.text,
     border: `1px solid ${theme.border}`,
-    borderRadius: '4px'
+    borderRadius: '4px',
+    boxSizing: 'border-box'
   }
 
   return (
@@ -148,16 +165,16 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
-          style={{ ...inputStyle, flexGrow: 1, minWidth: '180px' }}
+          style={{ ...inputStyle, flexGrow: 1, minWidth: '100%' }}
         />
         
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', width: '100%' }}>
           <input
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
             required
-            style={inputStyle}
+            style={{ ...inputStyle, flexGrow: 1 }}
           />
           <button
             type="button"
@@ -170,19 +187,20 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
               color: 'white',
               cursor: 'pointer',
               fontWeight: 'bold',
-              fontSize: '0.85rem'
+              fontSize: '0.85rem',
+              whiteSpace: 'nowrap'
             }}
           >
             Today
           </button>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', width: '100%', flexWrap: 'wrap' }}>
           <input
             type="time"
             value={startTime}
             onChange={(e) => setStartTime(e.target.value)}
-            style={inputStyle}
+            style={{ ...inputStyle, flex: 1 }}
             title="Start Time"
           />
           <span>to</span>
@@ -190,14 +208,15 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
             type="time"
             value={endTime}
             onChange={(e) => setEndTime(e.target.value)}
-            style={inputStyle}
+            style={{ ...inputStyle, flex: 1 }}
             title="End Time"
           />
         </div>
+
         <select
           value={freq}
           onChange={(e) => setFreq(e.target.value)}
-          style={inputStyle}
+          style={{ ...inputStyle, width: '100%' }}
         >
           <option value="">Does not repeat</option>
           <option value="DAILY">Daily</option>
@@ -207,37 +226,89 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
         </select>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+      {freq && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', background: theme.bg, padding: '0.75rem', borderRadius: '4px', border: `1px solid ${theme.border}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Repeat every:</span>
+            <input
+              type="number"
+              min="1"
+              max="99"
+              value={interval}
+              onChange={(e) => setInterval(Number(e.target.value))}
+              style={{ ...inputStyle, width: '65px', padding: '0.3rem' }}
+            />
+            <span style={{ fontSize: '0.85rem' }}>
+              {freq === 'DAILY' ? 'day(s)' : freq === 'WEEKLY' ? 'week(s)' : freq === 'MONTHLY' ? 'month(s)' : 'year(s)'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Ends:</span>
+            <select
+              value={endType}
+              onChange={(e) => setEndType(e.target.value)}
+              style={{ ...inputStyle, padding: '0.3rem', width: 'auto', flexGrow: 1 }}
+            >
+              <option value="never">Never</option>
+              <option value="until">On date</option>
+              <option value="count">After occurrences</option>
+            </select>
+            {endType === 'until' && (
+              <input
+                type="date"
+                value={untilDate}
+                onChange={(e) => setUntilDate(e.target.value)}
+                required
+                style={{ ...inputStyle, padding: '0.3rem', width: '100%' }}
+              />
+            )}
+            {endType === 'count' && (
+              <input
+                type="number"
+                min="1"
+                max="999"
+                value={count}
+                onChange={(e) => setCount(Number(e.target.value))}
+                style={{ ...inputStyle, width: '75px', padding: '0.3rem' }}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', flexWrap: 'wrap' }}>
         <span style={{ fontWeight: 'bold', color: theme.subText }}>Duration presets:</span>
-        {[
-          { label: 'All Day', mins: 'ALL_DAY' },
-          { label: '+30m', mins: 30 },
-          { label: '+1 hr', mins: 60 },
-          { label: '+2 hrs', mins: 120 },
-          { label: '+4 hrs', mins: 240 }
-        ].map((p) => (
-          <button
-            type="button"
-            key={p.label}
-            onClick={() => applyDurationPreset(p.mins)}
-            style={{
-              padding: '0.25rem 0.5rem',
-              border: `1px solid ${theme.border}`,
-              borderRadius: '4px',
-              background: theme.bg,
-              color: theme.text,
-              cursor: 'pointer',
-              fontSize: '0.8rem'
-            }}
-          >
-            {p.label}
-          </button>
-        ))}
+        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+          {[
+            { label: 'All Day', mins: 'ALL_DAY' },
+            { label: '+30m', mins: 30 },
+            { label: '+1 hr', mins: 60 },
+            { label: '+2 hrs', mins: 120 },
+            { label: '+4 hrs', mins: 240 }
+          ].map((p) => (
+            <button
+              type="button"
+              key={p.label}
+              onClick={() => applyDurationPreset(p.mins)}
+              style={{
+                padding: '0.25rem 0.5rem',
+                border: `1px solid ${theme.border}`,
+                borderRadius: '4px',
+                background: theme.bg,
+                color: theme.text,
+                cursor: 'pointer',
+                fontSize: '0.8rem'
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
         <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Add to Calendars:</span>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
           {calendars.map((c) => (
             <label
               key={c.id}
@@ -266,20 +337,21 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
       </div>
 
       {freq === 'WEEKLY' && (
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Repeat on:</span>
+        <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.9rem', fontWeight: 'bold', width: '100%' }}>Repeat on:</span>
           {daysOfWeek.map((day) => (
             <button
               type="button"
               key={day.value}
               onClick={() => toggleDay(day.value)}
               style={{
-                padding: '0.3rem 0.6rem',
+                padding: '0.3rem 0.5rem',
                 border: `1px solid ${theme.border}`,
                 borderRadius: '4px',
                 background: selectedDays.includes(day.value) ? theme.primary : theme.bg,
                 color: selectedDays.includes(day.value) ? '#fff' : theme.text,
-                cursor: 'pointer'
+                cursor: 'pointer',
+                fontSize: '0.85rem'
               }}
             >
               {day.label}
@@ -312,8 +384,9 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
           border: 'none',
           borderRadius: '4px',
           cursor: 'pointer',
-          alignSelf: 'flex-start',
-          fontWeight: 'bold'
+          alignSelf: 'stretch',
+          fontWeight: 'bold',
+          marginTop: '0.5rem'
         }}
       >
         {isSubmitting ? 'Adding...' : 'Add Event'}

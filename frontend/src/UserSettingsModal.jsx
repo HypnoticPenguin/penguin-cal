@@ -9,7 +9,10 @@ export default function UserSettingsModal({
   currentUser,
   currentTheme,
   themeColors,
+  dateFormat,
+  calendars = [],
   onThemeChange,
+  onDateFormatChange,
   onUserUpdated,
   onEventsChanged
 }) {
@@ -22,11 +25,23 @@ export default function UserSettingsModal({
   const [cleanupMsg, setCleanupMsg] = useState({ text: '', isError: false })
   const [isCleaning, setIsCleaning] = useState(false)
 
+  // ICS Import States
+  const [importCalId, setImportCalId] = useState('')
+  const [importFile, setImportFile] = useState(null)
+  const [importLoading, setImportLoading] = useState(false)
+  const [importMessage, setImportMessage] = useState('')
+
   useEffect(() => {
     if (currentUser) {
       setDisplayName(currentUser.display_name || currentUser.username || '')
     }
   }, [currentUser])
+
+  useEffect(() => {
+    if (calendars.length > 0 && !importCalId) {
+      setImportCalId(calendars[0].id)
+    }
+  }, [calendars])
 
   if (!isOpen) return null
 
@@ -103,6 +118,38 @@ export default function UserSettingsModal({
     }
   }
 
+  const handleIcsUpload = async (e) => {
+    e.preventDefault()
+    if (!importFile || !importCalId) return
+    setImportLoading(true)
+    setImportMessage('')
+    const formData = new FormData()
+    formData.append('calendar_id', importCalId)
+    formData.append('file', importFile)
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch('/api/events/import-ics', {
+        method: 'POST',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: formData
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setImportMessage(data.message)
+        setImportFile(null)
+        if (onEventsChanged) onEventsChanged()
+      } else {
+        setImportMessage(data.detail || 'Import failed.')
+      }
+    } catch (err) {
+      setImportMessage('Network error during import.')
+    } finally {
+      setImportLoading(false)
+    }
+  }
+
   const inputStyle = {
     width: '100%',
     padding: '0.5rem',
@@ -143,7 +190,7 @@ export default function UserSettingsModal({
         }}
       >
         <h2 style={{ marginTop: 0, marginBottom: '1.25rem' }}>Account & App Settings</h2>
-
+        
         {currentUser?.is_admin && (
           <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
             <AdminPanel currentUserId={currentUser.id} theme={themeColors} />
@@ -177,39 +224,95 @@ export default function UserSettingsModal({
 
         <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
           <h3 style={{ margin: '0 0 0.75rem 0' }}>Appearance</h3>
-          <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Calendar Theme</label>
-          <select
-            value={currentTheme}
-            onChange={(e) => onThemeChange(e.target.value)}
-            style={inputStyle}
-          >
-            {themeList.map((t) => (
-              <option key={t.key} value={t.key}>
-                {t.name}
-              </option>
-            ))}
-          </select>
+          <div style={{ marginBottom: '0.75rem' }}>
+            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Calendar Theme</label>
+            <select
+              value={currentTheme}
+              onChange={(e) => onThemeChange(e.target.value)}
+              style={inputStyle}
+            >
+              {themeList.map((t) => (
+                <option key={t.key} value={t.key}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Date Format</label>
+            <select
+              value={dateFormat}
+              onChange={(e) => onDateFormatChange(e.target.value)}
+              style={inputStyle}
+            >
+              <option value="YYYY-MM-DD">YYYY-MM-DD (e.g. 2026-09-24)</option>
+              <option value="DD-MM-YYYY">DD-MM-YYYY (e.g. 24-09-2026)</option>
+              <option value="DD-Mon-YYYY">DD-Mon-YYYY (e.g. 24-Sep-2026)</option>
+            </select>
+          </div>
         </div>
 
-        {/* Data Management / Cleanup Section */}
+        {/* Data Management / ICS Import / Cleanup Section */}
         <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
-          <h3 style={{ margin: '0 0 0.75rem 0' }}>Data Management</h3>
-          <p style={{ fontSize: '0.85rem', color: themeColors.subText, marginBottom: '0.75rem' }}>
-            Remove old one-off events that occurred before today. Recurring events and future entries are safe.
-          </p>
-          {cleanupMsg.text && (
-            <p style={{ color: cleanupMsg.isError ? '#ff5252' : '#66bb6a', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
-              {cleanupMsg.text}
+          <h3 style={{ margin: '0 0 0.75rem 0' }}>Data Management & Imports</h3>
+          
+          {/* ICS Import Subsection */}
+          <div style={{ marginBottom: '1.25rem' }}>
+            <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem' }}>Import Calendar (.ics)</h4>
+            {importMessage && <p style={{ fontSize: '0.85rem', color: themeColors.primary, marginBottom: '0.5rem' }}>{importMessage}</p>}
+            <form onSubmit={handleIcsUpload} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.80rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Target Calendar</label>
+                <select
+                  value={importCalId}
+                  onChange={(e) => setImportCalId(e.target.value)}
+                  style={inputStyle}
+                >
+                  {calendars.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.80rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Select .ics File</label>
+                <input
+                  type="file"
+                  accept=".ics"
+                  onChange={(e) => setImportFile(e.target.files[0])}
+                  required
+                  style={{ width: '100%', color: themeColors.text, fontSize: '0.85rem' }}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={importLoading}
+                style={{ padding: '0.4rem 0.8rem', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', alignSelf: 'flex-start', fontSize: '0.85rem' }}
+              >
+                {importLoading ? 'Importing...' : 'Import Events'}
+              </button>
+            </form>
+          </div>
+
+          {/* Cleanup Subsection */}
+          <div style={{ paddingTop: '0.75rem', borderTop: `1px dashed ${themeColors.border}` }}>
+            <h4 style={{ margin: '0 0 0.3rem 0', fontSize: '0.95rem' }}>Clear Past Events</h4>
+            <p style={{ fontSize: '0.80rem', color: themeColors.subText, marginBottom: '0.75rem' }}>
+              Remove old one-off events that occurred before today. Recurring events and future entries are safe.
             </p>
-          )}
-          <button
-            type="button"
-            disabled={isCleaning}
-            onClick={handlePassCleanup => handleCleanupPastEvents()}
-            style={{ padding: '0.5rem 1rem', background: '#d32f2f', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-          >
-            {isCleaning ? 'Cleaning...' : 'Clear Past Events'}
-          </button>
+            {cleanupMsg.text && (
+              <p style={{ color: cleanupMsg.isError ? '#ff5252' : '#66bb6a', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
+                {cleanupMsg.text}
+              </p>
+            )}
+            <button
+              type="button"
+              disabled={isCleaning}
+              onClick={handleCleanupPastEvents}
+              style={{ padding: '0.4rem 0.8rem', background: '#d32f2f', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}
+            >
+              {isCleaning ? 'Cleaning...' : 'Clear Past Events'}
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handlePasswordSubmit}>

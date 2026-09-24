@@ -6,7 +6,8 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, select
 from models import User
 
-SECRET_KEY = "your-super-secret-key-keep-this-safe"
+
+SECRET_KEY = os.environ.get("JWT_SECRET", "penguin-cal-super-secret-key-change-in-prod")
 ALGORITHM = "HS256"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
