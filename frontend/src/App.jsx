@@ -24,17 +24,14 @@ export default function App() {
   const [showPastEvents, setShowPastEvents] = useState(false)
   
   const calendarRef = useRef(null)
-  
   const todayObj = new Date()
   const todayStr = todayObj.toISOString().slice(0, 10)
-  
   const futureObj = new Date()
   futureObj.setMonth(futureObj.getMonth() + 3)
   const futureStr = futureObj.toISOString().slice(0, 10)
-
+  
   const [filterStartDate, setFilterStartDate] = useState(todayStr)
   const [filterEndDate, setFilterEndDate] = useState(futureStr)
-
   const currentTheme = themes[themeKey] || themes.light
 
   useEffect(() => {
@@ -48,7 +45,6 @@ export default function App() {
       }
       
       setThemeKey(userSavedTheme)
-
       const userSavedFormat = localStorage.getItem(`dateFormat_${currentUser.id}`) || 'YYYY-MM-DD'
       setDateFormat(userSavedFormat)
     } else {
@@ -84,9 +80,8 @@ export default function App() {
       if (res.ok) {
         const data = await res.json()
         setCalendars(data)
-        if (activeCalendarIds.length === 0) {
-          setActiveCalendarIds(data.map((c) => c.id))
-        }
+        // Fixed using functional state update to prevent race conditions/stale closures
+        setActiveCalendarIds((prev) => (prev.length === 0 ? data.map((c) => c.id) : prev))
       }
     } catch (err) {
       console.error('Failed to fetch calendars:', err)
@@ -186,7 +181,7 @@ export default function App() {
     if (!evt.calendar_ids || evt.calendar_ids.length === 0) return false
     return evt.calendar_ids.some((calId) => activeCalendarIds.includes(calId))
   })
-  
+
   const filteredEvents = visibleEvents.filter((evt) => {
     let hasEnded = false
     if (evt.rrule) {
@@ -206,19 +201,15 @@ export default function App() {
         hasEnded = true
       }
     }
-
     if (!showPastEvents && hasEnded) {
       return false
     }
-
     if (filterStartDate && evt.date < filterStartDate) {
       return false
     }
-
     if (filterEndDate && evt.date > filterEndDate) {
       return false
     }
-
     return true
   }).sort((a, b) => a.date.localeCompare(b.date))
 
