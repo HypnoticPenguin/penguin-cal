@@ -101,7 +101,8 @@ export default function CalendarManager({
         borderRadius: '8px',
         marginBottom: '1.5rem',
         border: `1px solid ${theme.border}`,
-        transition: 'all 0.3s ease'
+        transition: 'all 0.3s ease',
+        boxSizing: 'border-box'
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -118,11 +119,12 @@ export default function CalendarManager({
               borderLeft: `6px solid ${cal.color}`,
               borderTop: `1px solid ${theme.border}`,
               borderRight: `1px solid ${theme.border}`,
-              borderBottom: `1px solid ${theme.border}`
+              borderBottom: `1px solid ${theme.border}`,
+              boxSizing: 'border-box'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 'bold' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 'bold', wordBreak: 'break-word' }}>
                 <input
                   type="checkbox"
                   checked={activeCalendarIds.includes(cal.id)}
@@ -144,46 +146,55 @@ export default function CalendarManager({
                     fontSize: '0.85rem'
                   }}
                 >
-                  {expandedCalId === cal.id ? 'Close Settings' : 'Calendar Settings'}
+                  {expandedCalId === cal.id ? 'Close Settings' : 'Settings'}
                 </button>
               ) : (
                 <span style={{ fontSize: '0.75rem', color: theme.subText, fontStyle: 'italic' }}>Shared with you</span>
               )}
             </div>
+
             {cal.is_owner && expandedCalId === cal.id && (
               <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: `1px solid ${theme.border}` }}>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: cal.is_default ? 0 : '1rem' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Display Name:</span>
-                  <input
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    style={{ padding: '0.3rem', fontSize: '0.85rem', flexGrow: 1, background: theme.cardBg, color: theme.text, border: `1px solid ${theme.border}` }}
-                  />
-                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold', marginLeft: '0.5rem' }}>Color:</span>
-                  <input
-                    type="color"
-                    value={editColor}
-                    onChange={(e) => setEditColor(e.target.value)}
-                    style={{ height: '30px', width: '36px', border: 'none', cursor: 'pointer', background: 'transparent' }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleSaveCalendarSettings(cal.id)}
-                    style={{
-                      padding: '0.3rem 0.7rem',
-                      background: '#4CAF50',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '0.85rem',
-                      fontWeight: 'bold'
-                    }}
-                  >
-                    Save Settings
-                  </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: cal.is_default ? 0 : '1rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Display Name:</span>
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      style={{ padding: '0.4rem', fontSize: '0.9rem', background: theme.cardBg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '4px', boxSizing: 'border-box', width: '100%' }}
+                    />
+                  </div>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Color:</span>
+                      <input
+                        type="color"
+                        value={editColor}
+                        onChange={(e) => setEditColor(e.target.value)}
+                        style={{ height: '32px', width: '40px', border: 'none', cursor: 'pointer', background: 'transparent' }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveCalendarSettings(cal.id)}
+                      style={{
+                        padding: '0.4rem 0.8rem',
+                        background: '#4CAF50',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '0.85rem',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      Save Settings
+                    </button>
+                  </div>
                 </div>
+
                 {cal.is_default ? (
                   <p style={{ fontSize: '0.8rem', color: theme.subText, fontStyle: 'italic', margin: '0.5rem 0 0 0' }}>
                     Note: Your default personal calendar is private and cannot be shared with other users.
@@ -194,7 +205,7 @@ export default function CalendarManager({
                       Shared Access:
                     </span>
                     {sharesMap[cal.id] && sharesMap[cal.id].length > 0 ? (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                         {sharesMap[cal.id].map((u) => (
                           <label
                             key={u.user_id}
@@ -202,12 +213,13 @@ export default function CalendarManager({
                               display: 'flex',
                               alignItems: 'center',
                               gap: '0.35rem',
-                              padding: '0.25rem 0.5rem',
+                              padding: '0.3rem 0.5rem',
                               background: u.has_access ? theme.accentBg : theme.cardBg,
                               border: `1px solid ${theme.border}`,
                               borderRadius: '4px',
                               cursor: 'pointer',
-                              fontSize: '0.85rem'
+                              fontSize: '0.85rem',
+                              boxSizing: 'border-box'
                             }}
                           >
                             <input
@@ -229,18 +241,19 @@ export default function CalendarManager({
           </div>
         ))}
       </div>
-      <form onSubmit={handleCreateCalendar} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+
+      <form onSubmit={handleCreateCalendar} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         <input
           type="text"
           placeholder="New calendar name"
           value={newCalName}
           onChange={(e) => setNewCalName(e.target.value)}
           required
-          style={{ padding: '0.4rem', flexGrow: 1, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}
+          style={{ padding: '0.5rem', background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '4px', boxSizing: 'border-box', width: '100%' }}
         />
         <button
           type="submit"
-          style={{ padding: '0.4rem 0.8rem', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          style={{ padding: '0.5rem 0.8rem', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
         >
           Add Calendar
         </button>

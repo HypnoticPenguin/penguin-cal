@@ -28,7 +28,6 @@ export default function AdminPanel({ currentUserId, theme }) {
       `Are you sure you want to delete user "${username}"?\nThis will permanently remove their account and all their calendar events.`
     )
     if (!confirmDelete) return
-
     try {
       const res = await apiFetch(`/admin/users/${userId}`, { method: 'DELETE' })
       if (res.ok) {
@@ -52,28 +51,73 @@ export default function AdminPanel({ currentUserId, theme }) {
         marginBottom: '2rem',
         border: `1px solid ${theme.border}`,
         boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-        transition: 'all 0.3s ease'
+        transition: 'all 0.3s ease',
+        boxSizing: 'border-box',
+        overflowX: 'auto'
       }}
     >
-      <h2 style={{ margin: '0 0 1rem 0', color: theme.primary }}>
+      <style>{`
+        .admin-table {
+          width: 100%;
+          border-collapse: collapse;
+          text-align: left;
+        }
+        .admin-table th, .admin-table td {
+          padding: 0.5rem;
+        }
+        @media (max-width: 600px) {
+          .admin-table, .admin-table tbody, .admin-table tr, .admin-table td, .admin-table th {
+            display: block;
+            width: 100%;
+          }
+          .admin-table thead {
+            display: none;
+          }
+          .admin-table tr {
+            margin-bottom: 1rem;
+            border: 1px solid ${theme.border};
+            border-radius: 6px;
+            padding: 0.5rem;
+            background: ${theme.bg};
+          }
+          .admin-table td {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.4rem 0.2rem;
+            border-bottom: 1px dashed ${theme.border};
+          }
+          .admin-table td:last-child {
+            border-bottom: none;
+            justify-content: flex-end;
+            margin-top: 0.5rem;
+          }
+        }
+      `}</style>
+
+      <h2 style={{ margin: '0 0 1rem 0', color: theme.primary, fontSize: '1.25rem' }}>
         Admin Panel: User Management
       </h2>
       {error && <p style={{ color: '#ff5252' }}>{error}</p>}
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+      <table className="admin-table">
         <thead>
           <tr style={{ borderBottom: `2px solid ${theme.border}` }}>
-            <th style={{ padding: '0.5rem', color: theme.text }}>ID</th>
-            <th style={{ padding: '0.5rem', color: theme.text }}>Username</th>
-            <th style={{ padding: '0.5rem', color: theme.text }}>Role</th>
-            <th style={{ padding: '0.5rem', textAlign: 'right', color: theme.text }}>Actions</th>
+            <th style={{ color: theme.text }}>ID</th>
+            <th style={{ color: theme.text }}>Username</th>
+            <th style={{ color: theme.text }}>Role</th>
+            <th style={{ textAlign: 'right', color: theme.text }}>Actions</th>
           </tr>
         </thead>
         <tbody>
           {users.map((user) => (
             <tr key={user.id} style={{ borderBottom: `1px solid ${theme.border}` }}>
-              <td style={{ padding: '0.5rem', color: theme.text }}>{user.id}</td>
-              <td style={{ padding: '0.5rem', color: theme.text }}>
+              <td>
+                <span style={{ fontWeight: 'bold', display: 'inline-block', minWidth: '40px' }} className="mobile-label">ID:</span>
+                {user.id}
+              </td>
+              <td>
+                <span style={{ fontWeight: 'bold', display: 'none' }} className="mobile-label">User: </span>
                 <strong>{user.username}</strong>
                 {user.id === currentUserId && (
                   <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: theme.subText }}>
@@ -81,7 +125,8 @@ export default function AdminPanel({ currentUserId, theme }) {
                   </span>
                 )}
               </td>
-              <td style={{ padding: '0.5rem' }}>
+              <td>
+                <span style={{ fontWeight: 'bold', display: 'none' }} className="mobile-label">Role: </span>
                 {user.is_admin ? (
                   <span
                     style={{
@@ -110,7 +155,7 @@ export default function AdminPanel({ currentUserId, theme }) {
                   </span>
                 )}
               </td>
-              <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+              <td style={{ textAlign: 'right' }}>
                 {user.id !== currentUserId && (
                   <button
                     onClick={() => handleDeleteUser(user.id, user.username)}
@@ -119,9 +164,11 @@ export default function AdminPanel({ currentUserId, theme }) {
                       color: 'white',
                       border: 'none',
                       borderRadius: '4px',
-                      padding: '0.3rem 0.6rem',
+                      padding: '0.4rem 0.8rem',
                       cursor: 'pointer',
-                      fontWeight: 'bold'
+                      fontWeight: 'bold',
+                      fontSize: '0.85rem',
+                      width: '100%'
                     }}
                   >
                     Delete Account
