@@ -127,3 +127,25 @@ def toggle_calendar_share(
         session.commit()
         
     return {"status": "ok"}
+
+@router.delete("/{calendar_id}")
+def delete_calendar(
+    calendar_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    cal = session.get(Calendar, calendar_id)
+    if not cal or cal.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only calendar owners can delete calendars")
+    if cal.is_default:
+        raise HTTPException(status_code=400, detail="Personal default calendar cannot be deleted")
+    
+    # Delete associated event-calendar links first
+    from models import EventCalendarLink
+    links = session.exec(select(EventCalendarLink).where(EventCalendarLink.calendar_id == calendar_id)).all()
+    for link in links:
+        session.delete(link)
+        
+    session.delete(cal)
+    session.commit()
+    return {"message": f"Calendar '{cal.name}' deleted successfully."}    

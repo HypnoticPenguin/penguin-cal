@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -7,6 +7,17 @@ import interactionPlugin from '@fullcalendar/interaction'
 export default function CalendarView({ events, themeColors, dateFormat, onDateSelect, onEventClick, calendarRef, highlightedDate }) {
   const internalCalendarRef = useRef(null)
   const activeRef = calendarRef || internalCalendarRef
+
+  // Fix the "Today" button title attribute / tooltip text rendered by FullCalendar
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const todayBtn = document.querySelector('.fc-today-button')
+      if (todayBtn) {
+        todayBtn.setAttribute('title', 'Today')
+      }
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [])
 
   const handleDateClick = (arg) => {
     if (onDateSelect) onDateSelect(arg.dateStr)
@@ -70,12 +81,10 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
           color: ${themeColors.text} !important;
           background-color: ${themeColors.cardBg} !important;
         }
-
         /* Toolbar Header Title (Month/Year) */
         .fc .fc-toolbar-title {
           color: ${themeColors.text} !important;
         }
-
         /* Day of week column headers (Mon, Tue, Wed...) and wrapper header row background */
         .fc .fc-col-header,
         .fc .fc-col-header-cell,
@@ -84,7 +93,6 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
           background-color: ${themeColors.cardBg} !important;
           border-color: ${themeColors.border} !important;
         }
-
         .fc .fc-col-header-cell-cushion {
           color: ${themeColors.text} !important;
           font-weight: bold !important;
@@ -92,7 +100,6 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
           display: block;
           padding: 8px 4px;
         }
-
         /* Calendar grid day numbers */
         .fc .fc-daygrid-day-number,
         .fc .fc-timegrid-slot-label-cushion,
@@ -100,7 +107,6 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
           color: ${themeColors.text} !important;
           text-decoration: none !important;
         }
-
         /* Background grid styling for days/slots */
         .fc .fc-daygrid-day,
         .fc .fc-timegrid-slot,
@@ -108,7 +114,6 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
           background-color: transparent !important;
           border-color: ${themeColors.border} !important;
         }
-
         /* Toolbar Navigation & View Buttons */
         .fc .fc-button-primary {
           background-color: ${themeColors.primary} !important;
@@ -126,24 +131,20 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
         .fc .fc-button-active {
           filter: brightness(0.85);
         }
-
         /* All Borders & Scrollgrid Layout Lines */
         .fc th, .fc td, .fc hr, .fc .fc-scrollgrid, .fc-theme-standard td, .fc-theme-standard th {
           border-color: ${themeColors.border} !important;
         }
-
         /* Today Highlight cell */
         .fc .fc-day-today {
           background-color: ${themeColors.primary}20 !important;
         }
-
         /* Other months muted look */
         .fc .fc-day-other .fc-daygrid-day-number {
           opacity: 0.5;
           color: ${themeColors.subText} !important;
         }
       `}</style>
-
       <FullCalendar
         ref={activeRef}
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -151,7 +152,22 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
         headerToolbar={{
           left: 'prev,next today',
           center: 'title',
-          right: 'dayGridMonth,timeGridWeek,timeGridDay'
+          right: 'timeGridDay,timeGridWeek,dayGridMonth'
+        }}
+        buttonText={{
+          today: 'Today',
+          month: 'Month',
+          week: 'Week',
+          day: 'Day'
+        }}
+        customButtons={{
+          today: {
+            text: 'Today',
+            click: () => {
+              const calendarApi = activeRef.current.getApi()
+              calendarApi.today()
+            }
+          }
         }}
         events={fcEvents}
         editable={false}

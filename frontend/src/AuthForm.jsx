@@ -21,8 +21,10 @@ export default function AuthForm({ onAuthSuccess, theme }) {
     e.preventDefault()
     setError('')
     setLoading(true)
-    const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register'
     
+    // Ensure /api prefix is present
+    const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register'
+
     try {
       let response
       if (isLogin) {
@@ -39,10 +41,10 @@ export default function AuthForm({ onAuthSuccess, theme }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            username, 
-            display_name: displayName || username, 
-            password 
-          }),
+             username, 
+             display_name: displayName || username, 
+             password 
+           }),
         })
       }
 
@@ -90,7 +92,8 @@ export default function AuthForm({ onAuthSuccess, theme }) {
         backgroundColor: activeTheme.bg,
         color: activeTheme.text,
         transition: 'all 0.3s ease',
-        padding: '1rem'
+        padding: '1rem',
+        fontFamily: 'sans-serif'
       }}
     >
       <div

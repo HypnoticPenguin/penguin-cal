@@ -7,7 +7,6 @@ import EventForm from './EventForm.jsx'
 import EventItem from './EventItem.jsx'
 import CalendarView from './CalendarView.jsx'
 import EventModal from './EventModal.jsx'
-import CalendarManager from './CalendarManager.jsx'
 import UserSettingsModal from './UserSettingsModal.jsx'
 
 export default function App() {
@@ -21,7 +20,7 @@ export default function App() {
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [themeKey, setThemeKey] = useState('light')
   const [dateFormat, setDateFormat] = useState('YYYY-MM-DD')
-  const [showPastEvents, setShowPastEvents] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   
   const calendarRef = useRef(null)
   const todayObj = new Date()
@@ -29,9 +28,9 @@ export default function App() {
   const futureObj = new Date()
   futureObj.setMonth(futureObj.getMonth() + 3)
   const futureStr = futureObj.toISOString().slice(0, 10)
-  
   const [filterStartDate, setFilterStartDate] = useState(todayStr)
   const [filterEndDate, setFilterEndDate] = useState(futureStr)
+
   const currentTheme = themes[themeKey] || themes.light
 
   useEffect(() => {
@@ -76,12 +75,15 @@ export default function App() {
 
   const fetchCalendars = async () => {
     try {
-      const res = await apiFetch('/calendars')
+      const res = await apiFetch('/calendars/')
       if (res.ok) {
         const data = await res.json()
         setCalendars(data)
-        // Fixed using functional state update to prevent race conditions/stale closures
-        setActiveCalendarIds((prev) => (prev.length === 0 ? data.map((c) => c.id) : prev))
+        setActiveCalendarIds((prev) => {
+          if (prev.length === 0) return data.map((c) => c.id)
+          const newIds = data.map(c => c.id).filter(id => !prev.includes(id))
+          return [...prev, ...newIds]
+        })
       }
     } catch (err) {
       console.error('Failed to fetch calendars:', err)
@@ -90,7 +92,7 @@ export default function App() {
 
   const fetchEvents = async () => {
     try {
-      const res = await apiFetch('/events')
+      const res = await apiFetch('/events/')
       if (res.ok) {
         const data = await res.json()
         setEvents(data || [])
@@ -183,33 +185,22 @@ export default function App() {
   })
 
   const filteredEvents = visibleEvents.filter((evt) => {
-    let hasEnded = false
-    if (evt.rrule) {
-      const untilMatch = evt.rrule.match(/UNTIL=([0-9TZ]+)/)
-      if (untilMatch) {
-        const untilStr = untilMatch[1]
-        const year = untilStr.slice(0, 4)
-        const month = untilStr.slice(4, 6)
-        const day = untilStr.slice(6, 8)
-        const untilDate = `${year}-${month}-${day}`
-        if (untilDate < todayStr) {
-          hasEnded = true
-        }
-      }
-    } else {
-      if (evt.date < todayStr) {
-        hasEnded = true
-      }
-    }
-    if (!showPastEvents && hasEnded) {
-      return false
-    }
     if (filterStartDate && evt.date < filterStartDate) {
       return false
     }
     if (filterEndDate && evt.date > filterEndDate) {
       return false
     }
+    
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      const matchesTitle = evt.title && evt.title.toLowerCase().includes(query)
+      const matchesNotes = evt.notes && evt.notes.toLowerCase().includes(query)
+      if (!matchesTitle && !matchesNotes) {
+        return false
+      }
+    }
+
     return true
   }).sort((a, b) => a.date.localeCompare(b.date))
 
@@ -265,7 +256,6 @@ export default function App() {
           }
         }
       `}</style>
-
       <div
         className="app-container"
         style={{
@@ -308,16 +298,68 @@ export default function App() {
           </div>
         </div>
 
-        <CalendarManager
-          calendars={calendars}
-          activeCalendarIds={activeCalendarIds}
-          theme={currentTheme}
-          onToggleCalendar={handleToggleCalendar}
-          onCalendarCreated={() => {
-            fetchCalendars()
-            fetchEvents()
+        {/* Calendar visibility filter chips */}
+        <div
+          style={{
+            background: currentTheme.cardBg,
+            color: currentTheme.text,
+            padding: '1rem',
+            borderRadius: '8px',
+            marginBottom: '1.5rem',
+            border: `1px solid ${currentTheme.border}`,
+            boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+            transition: 'all 0.3s ease',
+            boxSizing: 'border-box'
           }}
-        />
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div>
+              <h3 style={{ margin: '0 0 0.2rem 0', fontSize: '1.1rem' }}>Calendars</h3>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: currentTheme.subText }}>
+                Check boxes to toggle calendar visibility. Manage or add calendars in Settings.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowSettingsModal(true)}
+              style={{ padding: '0.35rem 0.7rem', background: currentTheme.primary, color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 'bold' }}
+            >
+              ⚙ Manage Calendars
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+            {calendars.map((cal) => {
+              const isVisible = activeCalendarIds.includes(cal.id)
+              return (
+                <label
+                  key={cal.id}
+                  title="Click to toggle calendar visibility"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    background: isVisible ? `${cal.color}15` : currentTheme.bg,
+                    padding: '0.3rem 0.6rem',
+                    borderRadius: '6px',
+                    border: `1px solid ${isVisible ? cal.color : currentTheme.border}`,
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isVisible}
+                    onChange={() => handleToggleCalendar(cal.id)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: cal.color }}></span>
+                  <span style={{ fontWeight: isVisible ? 'bold' : 'normal' }}>{cal.name}</span>
+                </label>
+              )
+            })}
+          </div>
+        </div>
 
         <h2>Create New Event</h2>
         <EventForm calendars={calendars} theme={currentTheme} onEventAdded={fetchEvents} defaultDate={selectedDate} />
@@ -335,6 +377,40 @@ export default function App() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2rem', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
           <h2 style={{ margin: 0 }}>Events</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem' }}>
+              <input
+                type="text"
+                placeholder="Search events..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  padding: '0.3rem 0.5rem',
+                  background: currentTheme.cardBg,
+                  color: currentTheme.text,
+                  border: `1px solid ${currentTheme.border}`,
+                  borderRadius: '4px',
+                  width: '150px'
+                }}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  style={{
+                    padding: '0.25rem 0.4rem',
+                    background: 'transparent',
+                    color: currentTheme.subText,
+                    border: `1px solid ${currentTheme.border}`,
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.75rem'
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem' }}>
               <span style={{ fontWeight: 'bold', color: currentTheme.subText }}>From:</span>
               <input
@@ -361,14 +437,6 @@ export default function App() {
                 Reset Dates
               </button>
             )}
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', cursor: 'pointer', background: currentTheme.cardBg, padding: '0.3rem 0.6rem', borderRadius: '4px', border: `1px solid ${currentTheme.border}` }}>
-              <input
-                type="checkbox"
-                checked={showPastEvents}
-                onChange={(e) => setShowPastEvents(e.target.checked)}
-              />
-              Show past events
-            </label>
           </div>
         </div>
 
@@ -399,7 +467,7 @@ export default function App() {
               />
             ))
           ) : (
-            <p style={{ color: currentTheme.subText }}>No events found matching the selected range.</p>
+            <p style={{ color: currentTheme.subText }}>No events found matching your search or date range.</p>
           )}
         </ul>
 
@@ -438,6 +506,10 @@ export default function App() {
           onDateFormatChange={handleDateFormatChange}
           onUserUpdated={fetchUser}
           onEventsChanged={fetchEvents}
+          onCalendarsChanged={() => {
+            fetchCalendars()
+            fetchEvents()
+          }}
         />
       </div>
 

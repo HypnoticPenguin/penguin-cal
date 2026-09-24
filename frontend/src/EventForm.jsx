@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from './api.js'
+import RecurrenceBuilder from './RecurrenceBuilder.jsx'
 
 export default function EventForm({ calendars, theme, onEventAdded, defaultDate }) {
   const [title, setTitle] = useState('')
@@ -13,22 +14,12 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
   // Advanced Recurrence States
   const [freq, setFreq] = useState('')
   const [interval, setInterval] = useState(1)
-  const [endType, setEndType] = useState('never') // 'never', 'until', 'count'
+  const [endType, setEndType] = useState('never') 
   const [untilDate, setUntilDate] = useState('')
   const [count, setCount] = useState(10)
   const [selectedDays, setSelectedDays] = useState([])
   const [monthDay, setMonthDay] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
-
-  const daysOfWeek = [
-    { label: 'Mon', value: 'MO' },
-    { label: 'Tue', value: 'TU' },
-    { label: 'Wed', value: 'WE' },
-    { label: 'Thu', value: 'TH' },
-    { label: 'Fri', value: 'FR' },
-    { label: 'Sat', value: 'SA' },
-    { label: 'Sun', value: 'SU' },
-  ]
 
   useEffect(() => {
     if (calendars.length > 0 && selectedCalIds.length === 0) {
@@ -56,12 +47,6 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
     )
   }
 
-  const toggleDay = (dayVal) => {
-    setSelectedDays((prev) =>
-      prev.includes(dayVal) ? prev.filter((d) => d !== dayVal) : [...prev, dayVal]
-    )
-  }
-
   const applyDurationPreset = (minutes, label) => {
     setActivePreset(label)
     if (minutes === 'ALL_DAY') {
@@ -85,6 +70,7 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
     if (interval && interval > 1) {
       parts.push(`INTERVAL=${interval}`)
     }
+    // Only include BYDAY if the frequency is strictly WEEKLY
     if (freq === 'WEEKLY' && selectedDays.length > 0) {
       parts.push(`BYDAY=${selectedDays.join(',')}`)
     }
@@ -232,69 +218,25 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
           rows={2}
           style={{ ...inputStyle, width: '100%', resize: 'vertical' }}
         />
-
-        <select
-          value={freq}
-          onChange={(e) => setFreq(e.target.value)}
-          style={{ ...inputStyle, width: '100%' }}
-        >
-          <option value="">Does not repeat</option>
-          <option value="DAILY">Daily</option>
-          <option value="WEEKLY">Weekly</option>
-          <option value="MONTHLY">Monthly</option>
-          <option value="YEARLY">Yearly</option>
-        </select>
       </div>
 
-      {freq && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', background: theme.bg, padding: '0.75rem', borderRadius: '4px', border: `1px solid ${theme.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Repeat every:</span>
-            <input
-              type="number"
-              min="1"
-              max="99"
-              value={interval}
-              onChange={(e) => setInterval(Number(e.target.value))}
-              style={{ ...inputStyle, width: '65px', padding: '0.3rem' }}
-            />
-            <span style={{ fontSize: '0.85rem' }}>
-              {freq === 'DAILY' ? 'day(s)' : freq === 'WEEKLY' ? 'week(s)' : freq === 'MONTHLY' ? 'month(s)' : 'year(s)'}
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Ends:</span>
-            <select
-              value={endType}
-              onChange={(e) => setEndType(e.target.value)}
-              style={{ ...inputStyle, padding: '0.3rem', width: 'auto', flexGrow: 1 }}
-            >
-              <option value="never">Never</option>
-              <option value="until">On date</option>
-              <option value="count">After occurrences</option>
-            </select>
-            {endType === 'until' && (
-              <input
-                type="date"
-                value={untilDate}
-                onChange={(e) => setUntilDate(e.target.value)}
-                required
-                style={{ ...inputStyle, padding: '0.3rem', width: '100%' }}
-              />
-            )}
-            {endType === 'count' && (
-              <input
-                type="number"
-                min="1"
-                max="999"
-                value={count}
-                onChange={(e) => setCount(Number(e.target.value))}
-                style={{ ...inputStyle, width: '75px', padding: '0.3rem' }}
-              />
-            )}
-          </div>
-        </div>
-      )}
+      <RecurrenceBuilder
+        freq={freq}
+        setFreq={setFreq}
+        interval={interval}
+        setInterval={setInterval}
+        endType={endType}
+        setEndType={setEndType}
+        untilDate={untilDate}
+        setUntilDate={setUntilDate}
+        count={count}
+        setCount={setCount}
+        selectedDays={selectedDays}
+        setSelectedDays={setSelectedDays}
+        monthDay={monthDay}
+        setMonthDay={setMonthDay}
+        theme={theme}
+      />
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', flexWrap: 'wrap' }}>
         <span style={{ fontWeight: 'bold', color: theme.subText }}>Duration presets:</span>
@@ -360,44 +302,6 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
           ))}
         </div>
       </div>
-
-      {freq === 'WEEKLY' && (
-        <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.9rem', fontWeight: 'bold', width: '100%' }}>Repeat on:</span>
-          {daysOfWeek.map((day) => (
-            <button
-              type="button"
-              key={day.value}
-              onClick={() => toggleDay(day.value)}
-              style={{
-                padding: '0.3rem 0.5rem',
-                border: `1px solid ${theme.border}`,
-                borderRadius: '4px',
-                background: selectedDays.includes(day.value) ? theme.primary : theme.bg,
-                color: selectedDays.includes(day.value) ? '#fff' : theme.text,
-                cursor: 'pointer',
-                fontSize: '0.85rem'
-              }}
-            >
-              {day.label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {freq === 'MONTHLY' && (
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Day of month:</span>
-          <input
-            type="number"
-            min="1"
-            max="31"
-            value={monthDay}
-            onChange={(e) => setMonthDay(Number(e.target.value))}
-            style={{ ...inputStyle, width: '60px' }}
-          />
-        </div>
-      )}
 
       <button
         type="submit"

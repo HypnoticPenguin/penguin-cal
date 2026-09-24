@@ -12,7 +12,6 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
   const [startTime, setStartTime] = useState(event.start_time || event.time || '')
   const [endTime, setEndTime] = useState(event.end_time || '')
   const [notes, setNotes] = useState(event.notes || '')
-
   const [freq, setFreq] = useState('')
   const [interval, setInterval] = useState(1)
   const [endType, setEndType] = useState('never')
@@ -22,7 +21,6 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
   const [monthDay, setMonthDay] = useState(1)
 
   const isRecurring = event.is_recurring || Boolean(event.rrule)
-
   const assignedCalendars = calendars.filter(
     (c) => event.calendar_ids && event.calendar_ids.includes(c.id)
   )
@@ -66,7 +64,7 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
     if (interval && interval > 1) {
       parts.push(`INTERVAL=${interval}`)
     }
-    if (freq === 'WEEKLY' && selectedDays.length > 0) {
+    if ((freq === 'WEEKLY' || freq === 'DAILY') && selectedDays.length > 0) {
       parts.push(`BYDAY=${selectedDays.join(',')}`)
     }
     if (freq === 'MONTHLY') {
@@ -122,11 +120,17 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
 
   const getRecurrenceText = () => {
     if (!event.rrule) return 'Recurring'
-
-    if (!event.rrule.includes('UNTIL=') && !event.rrule.includes('COUNT=')) {
-      return 'Repeats indefinitely'
+    
+    const freqMatch = event.rrule.match(/FREQ=([A-Z]+)/)
+    let freqLabel = 'Recurring'
+    if (freqMatch) {
+      const rawFreq = freqMatch[1].toLowerCase()
+      freqLabel = rawFreq.charAt(0).toUpperCase() + rawFreq.slice(1)
     }
 
+    if (!event.rrule.includes('UNTIL=') && !event.rrule.includes('COUNT=')) {
+      return `${freqLabel}, repeats indefinitely`
+    }
     try {
       const startTimeVal = event.start_time || event.time
       const dtstart = new Date(startTimeVal ? `${event.date}T${startTimeVal}:00` : `${event.date}T00:00:00`)
@@ -139,13 +143,12 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
         const month = String(lastDate.getUTCMonth() + 1).padStart(2, '0')
         const day = String(lastDate.getUTCDate()).padStart(2, '0')
         const formattedEndDate = formatDate(`${year}-${month}-${day}`, dateFormat)
-        return `Ends on ${formattedEndDate}`
+        return `${freqLabel}, ends on ${formattedEndDate}`
       }
     } catch (err) {
       console.error('Failed to parse recurrence end date:', err)
     }
-
-    return 'Repeats indefinitely'
+    return freqLabel
   }
 
   return (
@@ -206,7 +209,6 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
                   {cal.name}
                 </span>
               ))}
-
               {event.is_recurring && (
                 <span
                   style={{
@@ -221,7 +223,7 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
                     gap: '0.2rem'
                   }}
                 >
-                  Recurring ({getRecurrenceText()})
+                  {getRecurrenceText()}
                 </span>
               )}
             </div>

@@ -4,6 +4,11 @@ import { themeList } from './themes.js'
 import AdminPanel from './AdminPanel.jsx'
 import ConfirmModal from './ConfirmModal.jsx'
 
+const COLOR_PALETTE = [
+  '#2196F3', '#4CAF50', '#FF9800', '#E91E63', 
+  '#9C27B0', '#00BCD4', '#FFEB3B', '#795548', '#607D8B', '#F44336'
+]
+
 export default function UserSettingsModal({
   isOpen,
   onClose,
@@ -15,7 +20,8 @@ export default function UserSettingsModal({
   onThemeChange,
   onDateFormatChange,
   onUserUpdated,
-  onEventsChanged
+  onEventsChanged,
+  onCalendarsChanged
 }) {
   const [displayName, setDisplayName] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
@@ -26,12 +32,17 @@ export default function UserSettingsModal({
   const [cleanupMsg, setCleanupMsg] = useState({ text: '', isError: false })
   const [isCleaning, setIsCleaning] = useState(false)
   const [showCleanupConfirm, setShowCleanupConfirm] = useState(false)
-
-  // ICS Import States
   const [importCalId, setImportCalId] = useState('')
   const [importFile, setImportFile] = useState(null)
   const [importLoading, setImportLoading] = useState(false)
   const [importMessage, setImportMessage] = useState('')
+
+  // Calendar Management States inside Settings
+  const [showCreateCal, setShowCreateCal] = useState(false)
+  const [newCalName, setNewCalName] = useState('')
+  const [newCalColor, setNewCalColor] = useState('#2196F3')
+  const [calMsg, setCalMsg] = useState({ text: '', isError: false })
+  const [deleteCalTarget, setDeleteCalTarget] = useState(null)
 
   useEffect(() => {
     if (currentUser) {
@@ -50,8 +61,11 @@ export default function UserSettingsModal({
       setProfileMsg({ text: '', isError: false })
       setPassMsg({ text: '', isError: false })
       setCleanupMsg({ text: '', isError: false })
+      setCalMsg({ text: '', isError: false })
       setImportMessage('')
       setShowCleanupConfirm(false)
+      setShowCreateCal(false)
+      setDeleteCalTarget(null)
     }
   }, [isOpen])
 
@@ -61,7 +75,65 @@ export default function UserSettingsModal({
     if (activeSection !== 'profile') setProfileMsg({ text: '', isError: false })
     if (activeSection !== 'pass') setPassMsg({ text: '', isError: false })
     if (activeSection !== 'cleanup') setCleanupMsg({ text: '', isError: false })
+    if (activeSection !== 'calendars') setCalMsg({ text: '', isError: false })
     if (activeSection !== 'import') setImportMessage('')
+  }
+
+  const handleOpenCreateCal = () => {
+    if (!showCreateCal) {
+      const usedColors = calendars.map(c => (c.color || '').toLowerCase())
+      const availableColors = COLOR_PALETTE.filter(c => !usedColors.includes(c.toLowerCase()))
+      const pool = availableColors.length > 0 ? availableColors : COLOR_PALETTE
+      setNewCalColor(pool[Math.floor(Math.random() * pool.length)])
+      setNewCalName('')
+    }
+    setShowCreateCal(!showCreateCal)
+  }
+
+  const handleCreateCalendar = async (e) => {
+    e.preventDefault()
+    if (!newCalName) return
+    clearMessagesExcept('calendars')
+    try {
+      const res = await apiFetch('/calendars/', {
+        method: 'POST',
+        body: JSON.stringify({ name: newCalName, color: newCalColor })
+      })
+      if (res.ok) {
+        setNewCalName('')
+        setShowCreateCal(false)
+        setCalMsg({ text: 'Calendar created successfully!', isError: false })
+        if (onCalendarsChanged) onCalendarsChanged()
+      } else {
+        const data = await res.json()
+        setCalMsg({ text: data.detail || 'Failed to create calendar', isError: true })
+      }
+    } catch (err) {
+      setCalMsg({ text: 'Error creating calendar', isError: true })
+    }
+  }
+
+  const handleDeleteCalendar = async () => {
+    if (!deleteCalTarget) return
+    clearMessagesExcept('calendars')
+    try {
+      const res = await apiFetch(`/calendars/${deleteCalTarget.id}`, {
+        method: 'DELETE'
+      })
+      if (res.ok) {
+        setCalMsg({ text: `Calendar '${deleteCalTarget.name}' deleted.`, isError: false })
+        setDeleteCalTarget(null)
+        if (onCalendarsChanged) onCalendarsChanged()
+        if (onEventsChanged) onEventsChanged()
+      } else {
+        const data = await res.json()
+        setCalMsg({ text: data.detail || 'Failed to delete calendar', isError: true })
+        setDeleteCalTarget(null)
+      }
+    } catch (err) {
+      setCalMsg({ text: 'Error deleting calendar', isError: true })
+      setDeleteCalTarget(null)
+    }
   }
 
   const handleProfileSubmit = async (e) => {
@@ -118,27 +190,20 @@ export default function UserSettingsModal({
     setIsCleaning(true)
     clearMessagesExcept('cleanup')
     try {
-      const res = await apiFetch('/events/cleanup-past', {
-        method: 'POST'
-      })
-      
+      const res = await apiFetch('/events/cleanup-past', { method: 'POST' })
       let data = {}
       try {
         data = await res.json()
       } catch (parseErr) {
         data = { message: 'Cleanup completed successfully.' }
       }
-
       if (res.ok) {
         setCleanupMsg({ text: data.message || 'Successfully cleared past events.', isError: false })
-        if (typeof onEventsChanged === 'function') {
-          onEventsChanged()
-        }
+        if (typeof onEventsChanged === 'function') onEventsChanged()
       } else {
         setCleanupMsg({ text: data.detail || 'Failed to clean up past events', isError: true })
       }
     } catch (err) {
-      console.error('Cleanup error:', err)
       setCleanupMsg({ text: 'Error executing cleanup request', isError: true })
     } finally {
       setIsCleaning(false)
@@ -157,9 +222,7 @@ export default function UserSettingsModal({
       const token = localStorage.getItem('token')
       const res = await fetch('/api/events/import-ics', {
         method: 'POST',
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: formData
       })
       const data = await res.json()
@@ -218,13 +281,14 @@ export default function UserSettingsModal({
         }}
       >
         <h2 style={{ marginTop: 0, marginBottom: '1.25rem' }}>Account & App Settings</h2>
-        
+
         {currentUser?.is_admin && (
           <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
             <AdminPanel currentUserId={currentUser.id} theme={themeColors} />
           </div>
         )}
 
+        {/* Profile Section */}
         <form 
           onSubmit={handleProfileSubmit} 
           onChange={() => clearMessagesExcept('profile')}
@@ -254,6 +318,91 @@ export default function UserSettingsModal({
           </button>
         </form>
 
+        {/* Calendar Management Section */}
+        <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+            <h3 style={{ margin: 0 }}>Calendar Management</h3>
+            <button
+              type="button"
+              onClick={handleOpenCreateCal}
+              style={{ padding: '0.35rem 0.7rem', background: themeColors.primary, color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 'bold' }}
+            >
+              {showCreateCal ? 'Cancel' : '+ New Calendar'}
+            </button>
+          </div>
+
+          {calMsg.text && (
+            <p style={{ color: calMsg.isError ? '#ff5252' : '#66bb6a', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
+              {calMsg.text}
+            </p>
+          )}
+
+          {showCreateCal && (
+            <form onSubmit={handleCreateCalendar} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '1rem', background: themeColors.bg, padding: '0.75rem', borderRadius: '6px', border: `1px solid ${themeColors.border}` }}>
+              <input
+                type="text"
+                placeholder="Calendar Name"
+                value={newCalName}
+                onChange={(e) => setNewCalName(e.target.value)}
+                required
+                style={{ ...inputStyle, flexGrow: 1, minWidth: '150px', background: themeColors.cardBg }}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+                <span>Color:</span>
+                <input
+                  type="color"
+                  value={newCalColor}
+                  onChange={(e) => setNewCalColor(e.target.value)}
+                  style={{ border: 'none', width: '32px', height: '32px', cursor: 'pointer', background: 'transparent' }}
+                />
+              </div>
+              <button
+                type="submit"
+                style={{ padding: '0.4rem 0.8rem', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', fontSize: '0.85rem' }}
+              >
+                Create
+              </button>
+            </form>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {calendars.map((cal) => (
+              <div
+                key={cal.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: themeColors.bg,
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '6px',
+                  border: `1px solid ${themeColors.border}`
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: cal.color }}></span>
+                  <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{cal.name}</span>
+                  {cal.is_default && (
+                    <span style={{ fontSize: '0.75rem', background: themeColors.cardBg, color: themeColors.subText, padding: '0.1rem 0.4rem', borderRadius: '4px', border: `1px solid ${themeColors.border}` }}>
+                      Personal
+                    </span>
+                  )}
+                </div>
+                {!cal.is_default && cal.is_owner && (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteCalTarget(cal)}
+                    style={{ background: '#d32f2f', color: 'white', border: 'none', borderRadius: '4px', padding: '0.25rem 0.6rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Appearance Section */}
         <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
           <h3 style={{ margin: '0 0 0.75rem 0' }}>Appearance</h3>
           <div style={{ marginBottom: '0.75rem' }}>
@@ -290,7 +439,7 @@ export default function UserSettingsModal({
           </div>
         </div>
 
-        {/* Data Management / ICS Import / Cleanup Section */}
+        {/* Data Management & Imports */}
         <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
           <h3 style={{ margin: '0 0 0.75rem 0' }}>Data Management & Imports</h3>
           
@@ -323,7 +472,7 @@ export default function UserSettingsModal({
               <button
                 type="submit"
                 disabled={importLoading}
-                style={{ padding: '0.4rem 0.8rem', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', alignSelf: 'flex-start', fontSize: '0.85rem' }}
+                style={{ padding: '0.4rem 0.8rem', background: themeColors.primary, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', alignSelf: 'flex-start', fontSize: '0.85rem' }}
               >
                 {importLoading ? 'Importing...' : 'Import Events'}
               </button>
@@ -351,6 +500,7 @@ export default function UserSettingsModal({
           </div>
         </div>
 
+        {/* Change Password */}
         <form onSubmit={handlePasswordSubmit} onChange={() => clearMessagesExcept('pass')}>
           <h3 style={{ margin: '0 0 0.75rem 0' }}>Change Password</h3>
           {passMsg.text && (
@@ -388,19 +538,19 @@ export default function UserSettingsModal({
               style={inputStyle}
             />
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+            <button
+              type="submit"
+              style={{ padding: '0.5rem 1rem', background: themeColors.primary, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              Update Password
+            </button>
             <button
               type="button"
               onClick={onClose}
               style={{ padding: '0.5rem 1rem', background: '#e0e0e0', color: '#333', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
             >
               Close
-            </button>
-            <button
-              type="submit"
-              style={{ padding: '0.5rem 1rem', background: themeColors.primary, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-            >
-              Update Password
             </button>
           </div>
         </form>
@@ -415,6 +565,17 @@ export default function UserSettingsModal({
         theme={themeColors}
         onConfirm={handleCleanupPastEvents}
         onClose={() => setShowCleanupConfirm(false)}
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(deleteCalTarget)}
+        title="Delete Calendar?"
+        message={`Are you sure you want to delete calendar '${deleteCalTarget?.name}'? All associated events linked only to this calendar will be removed.`}
+        confirmText="Yes, Delete"
+        confirmColor="#d32f2f"
+        theme={themeColors}
+        onConfirm={handleDeleteCalendar}
+        onClose={() => setDeleteCalTarget(null)}
       />
     </div>
   )
