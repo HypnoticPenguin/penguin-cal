@@ -3,15 +3,24 @@ import { RRule } from 'rrule'
 import { apiFetch, formatDate } from './api.js'
 import DeleteModal from './DeleteModal.jsx'
 import RecurrenceBuilder from './RecurrenceBuilder.jsx'
+import { useEventTime } from './hooks/useEventTime.js'
+import { buildRruleString } from './utils/recurrence.js'
 
 export default function EventItem({ event, calendars = [], theme, dateFormat, onDelete, onUpdate, onGoToCalendar }) {
   const [isEditing, setIsEditing] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [title, setTitle] = useState(event.title)
   const [date, setDate] = useState(event.date)
-  const [startTime, setStartTime] = useState(event.start_time || event.time || '')
-  const [endTime, setEndTime] = useState(event.end_time || '')
   const [notes, setNotes] = useState(event.notes || '')
+  
+  const {
+    startTime,
+    setStartTime,
+    endTime,
+    setEndTime,
+    validateTimes
+  } = useEventTime()
+
   const [freq, setFreq] = useState('')
   const [interval, setInterval] = useState(1)
   const [endType, setEndType] = useState('never')
@@ -26,6 +35,9 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
   )
 
   const handleStartEdit = () => {
+    setStartTime(event.start_time || event.time || '')
+    setEndTime(event.end_time || '')
+
     const rruleStr = event.rrule || ''
     if (rruleStr) {
       const parts = rruleStr.split(';').reduce((acc, part) => {
@@ -58,28 +70,9 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
     setIsEditing(true)
   }
 
-  const buildRruleString = () => {
-    if (!freq) return null
-    let parts = [`FREQ=${freq}`]
-    if (interval && interval > 1) {
-      parts.push(`INTERVAL=${interval}`)
-    }
-    if ((freq === 'WEEKLY' || freq === 'DAILY') && selectedDays.length > 0) {
-      parts.push(`BYDAY=${selectedDays.join(',')}`)
-    }
-    if (freq === 'MONTHLY') {
-      parts.push(`BYMONTHDAY=${monthDay}`)
-    }
-    if (endType === 'until' && untilDate) {
-      const formattedUntil = untilDate.replace(/-/g, '') + 'T235959Z'
-      parts.push(`UNTIL=${formattedUntil}`)
-    } else if (endType === 'count' && count > 0) {
-      parts.push(`COUNT=${count}`)
-    }
-    return parts.join(';')
-  }
-
   const handleSave = async () => {
+    if (!validateTimes()) return
+
     try {
       const response = await apiFetch(`/events/${event.id}`, {
         method: 'PUT',
@@ -89,7 +82,7 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
           start_time: startTime || null,
           end_time: endTime || null,
           notes: notes || null,
-          rrule: buildRruleString()
+          rrule: buildRruleString({ freq, interval, endType, untilDate, count, selectedDays, monthDay })
         }),
       })
       if (response.ok) {
@@ -120,14 +113,13 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
 
   const getRecurrenceText = () => {
     if (!event.rrule) return 'Recurring'
-    
+
     const freqMatch = event.rrule.match(/FREQ=([A-Z]+)/)
     let freqLabel = 'Recurring'
     if (freqMatch) {
       const rawFreq = freqMatch[1].toLowerCase()
       freqLabel = rawFreq.charAt(0).toUpperCase() + rawFreq.slice(1)
     }
-
     if (!event.rrule.includes('UNTIL=') && !event.rrule.includes('COUNT=')) {
       return `${freqLabel}, repeats indefinitely`
     }
@@ -136,7 +128,7 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
       const dtstart = new Date(startTimeVal ? `${event.date}T${startTimeVal}:00` : `${event.date}T00:00:00`)
       const rule = RRule.fromString(`DTSTART:${dtstart.toISOString().replace(/[-:]/g, '').split('.')[0]}Z\nRRULE:${event.rrule}`)
       const allDates = rule.all()
-      
+
       if (allDates.length > 0) {
         const lastDate = allDates[allDates.length - 1]
         const year = lastDate.getUTCFullYear()
@@ -163,7 +155,7 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
               <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={{ padding: '0.4rem', background: theme.cardBg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '4px' }} title="End Time" />
             </div>
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes..." rows={2} style={{ padding: '0.4rem', background: theme.cardBg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '4px', resize: 'vertical' }} />
-            
+
             <RecurrenceBuilder
               freq={freq}
               setFreq={setFreq}
@@ -188,7 +180,7 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
               <span>
                 <strong>{formatDate(event.date, dateFormat)}{formatTimeDisplay()}:</strong> {event.title}
               </span>
-              
+
               {assignedCalendars.map((cal) => (
                 <span
                   key={cal.id}
@@ -242,8 +234,8 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
             </>
           ) : (
             <>
-              <button 
-                onClick={() => onGoToCalendar && onGoToCalendar(event.date)} 
+              <button
+                onClick={() => onGoToCalendar && onGoToCalendar(event.date)}
                 title="View on Calendar"
                 style={{ background: '#607d8b', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', cursor: 'pointer', fontSize: '0.85rem' }}
               >

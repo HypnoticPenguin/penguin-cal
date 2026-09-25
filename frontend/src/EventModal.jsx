@@ -1,16 +1,24 @@
 import { useState, useEffect } from 'react'
 import RecurrenceBuilder from './RecurrenceBuilder.jsx'
+import { useEventTime } from './hooks/useEventTime.js'
+import { buildRruleString } from './utils/recurrence.js'
 
 export default function EventModal({ isOpen, event, calendars = [], theme, onClose, onSave, onDelete }) {
   const [title, setTitle] = useState('')
   const [date, setDate] = useState('')
   const [originalDate, setOriginalDate] = useState('')
-  const [startTime, setStartTime] = useState('')
-  const [endTime, setEndTime] = useState('')
   const [notes, setNotes] = useState('')
   const [selectedCalIds, setSelectedCalIds] = useState([])
   const [showDateChangeConfirm, setShowDateChangeConfirm] = useState(false)
-  
+
+  const {
+    startTime,
+    setStartTime,
+    endTime,
+    setEndTime,
+    validateTimes
+  } = useEventTime()
+
   // Standardized Recurrence States
   const [freq, setFreq] = useState('')
   const [interval, setInterval] = useState(1)
@@ -28,15 +36,13 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
       setStartTime(event.start_time || event.time || '')
       setEndTime(event.end_time || '')
       setNotes(event.notes || '')
-      
-      // Ensure calendar_ids defaults safely to at least the first available calendar if empty
-      const initialCals = event.calendar_ids && event.calendar_ids.length > 0 
-        ? event.calendar_ids 
+
+      const initialCals = event.calendar_ids && event.calendar_ids.length > 0
+        ? event.calendar_ids
         : (calendars[0] ? [calendars[0].id] : [])
       setSelectedCalIds(initialCals)
-      
       setShowDateChangeConfirm(false)
-      
+
       const rruleStr = event.rrule || ''
       if (rruleStr) {
         const parts = rruleStr.split(';').reduce((acc, part) => {
@@ -76,33 +82,11 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
 
   const toggleCalendar = (calId) => {
     setSelectedCalIds((prev) => {
-      // Prevent unchecking if it's the last remaining calendar
       if (prev.includes(calId) && prev.length === 1) {
-        return prev 
+        return prev
       }
       return prev.includes(calId) ? prev.filter((id) => id !== calId) : [...prev, calId]
     })
-  }
-
-  const buildRruleString = () => {
-    if (!freq) return null
-    let parts = [`FREQ=${freq}`]
-    if (interval && interval > 1) {
-      parts.push(`INTERVAL=${interval}`)
-    }
-    if (freq === 'WEEKLY' && selectedDays.length > 0) {
-      parts.push(`BYDAY=${selectedDays.join(',')}`)
-    }
-    if (freq === 'MONTHLY') {
-      parts.push(`BYMONTHDAY=${monthDay}`)
-    }
-    if (endType === 'until' && untilDate) {
-      const formattedUntil = untilDate.replace(/-/g, '') + 'T235959Z'
-      parts.push(`UNTIL=${formattedUntil}`)
-    } else if (endType === 'count' && count > 0) {
-      parts.push(`COUNT=${count}`)
-    }
-    return parts.join(';')
   }
 
   const executeSave = () => {
@@ -113,19 +97,19 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
       end_time: endTime || null,
       notes: notes || null,
       calendar_ids: selectedCalIds,
-      rrule: buildRruleString()
+      rrule: buildRruleString({ freq, interval, endType, untilDate, count, selectedDays, monthDay })
     })
   }
 
   const handleFormSubmit = (e) => {
     e.preventDefault()
     if (selectedCalIds.length === 0) return
+    if (!validateTimes()) return
 
     if (isRecurring && date !== originalDate && !showDateChangeConfirm) {
       setShowDateChangeConfirm(true)
       return
     }
-
     executeSave()
   }
 
@@ -195,7 +179,6 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
             </span>
           )}
         </div>
-
         {showDateChangeConfirm ? (
           <div style={{ background: activeTheme.bg, padding: '1.25rem', borderRadius: '6px', border: `1px solid ${activeTheme.border}`, textAlign: 'center', marginBottom: '1rem' }}>
             <h4 style={{ margin: '0 0 0.75rem 0', color: '#ff9800' }}>Shift Recurring Series Start Date?</h4>
@@ -307,7 +290,6 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
                 })}
               </div>
             </div>
-
             <RecurrenceBuilder
               freq={freq}
               setFreq={setFreq}
@@ -325,7 +307,6 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
               setMonthDay={setMonthDay}
               theme={activeTheme}
             />
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
               <button
                 type="submit"

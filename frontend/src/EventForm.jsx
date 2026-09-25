@@ -1,20 +1,29 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from './api.js'
 import RecurrenceBuilder from './RecurrenceBuilder.jsx'
+import { useEventTime } from './hooks/useEventTime.js'
+import { buildRruleString } from './utils/recurrence.js'
 
 export default function EventForm({ calendars, theme, onEventAdded, defaultDate }) {
   const [title, setTitle] = useState('')
   const [date, setDate] = useState('')
-  const [startTime, setStartTime] = useState('')
-  const [endTime, setEndTime] = useState('')
   const [notes, setNotes] = useState('')
   const [selectedCalIds, setSelectedCalIds] = useState([])
-  const [activePreset, setActivePreset] = useState(null)
   
+  const {
+    startTime,
+    setStartTime,
+    endTime,
+    setEndTime,
+    activePreset,
+    applyPreset,
+    validateTimes
+  } = useEventTime()
+
   // Advanced Recurrence States
   const [freq, setFreq] = useState('')
   const [interval, setInterval] = useState(1)
-  const [endType, setEndType] = useState('never') 
+  const [endType, setEndType] = useState('never')
   const [untilDate, setUntilDate] = useState('')
   const [count, setCount] = useState(10)
   const [selectedDays, setSelectedDays] = useState([])
@@ -47,50 +56,24 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
     )
   }
 
-  const applyDurationPreset = (minutes, label) => {
-    setActivePreset(label)
-    if (minutes === 'ALL_DAY') {
-      setStartTime('')
-      setEndTime('')
-      return
-    }
-    const start = startTime || '09:00'
-    if (!startTime) setStartTime('09:00')
-    const [h, m] = start.split(':').map(Number)
-    const end = new Date()
-    end.setHours(h, m + minutes, 0, 0)
-    const endH = String(end.getHours()).padStart(2, '0')
-    const endM = String(end.getMinutes()).padStart(2, '0')
-    setEndTime(`${endH}:${endM}`)
-  }
-
-  const buildRruleString = () => {
-    if (!freq) return null
-    let parts = [`FREQ=${freq}`]
-    if (interval && interval > 1) {
-      parts.push(`INTERVAL=${interval}`)
-    }
-    // Only include BYDAY if the frequency is strictly WEEKLY
-    if (freq === 'WEEKLY' && selectedDays.length > 0) {
-      parts.push(`BYDAY=${selectedDays.join(',')}`)
-    }
-    if (freq === 'MONTHLY') {
-      parts.push(`BYMONTHDAY=${monthDay}`)
-    }
-    if (endType === 'until' && untilDate) {
-      const formattedUntil = untilDate.replace(/-/g, '') + 'T235959Z'
-      parts.push(`UNTIL=${formattedUntil}`)
-    } else if (endType === 'count' && count > 0) {
-      parts.push(`COUNT=${count}`)
-    }
-    return parts.join(';')
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!title || !date || selectedCalIds.length === 0) return
+    
+    // Validate that start time comes before end time
+    if (!validateTimes()) return
+
     setIsSubmitting(true)
-    const rrule = buildRruleString()
+    const rrule = buildRruleString({
+      freq,
+      interval,
+      endType,
+      untilDate,
+      count,
+      selectedDays,
+      monthDay
+    })
+
     try {
       const response = await apiFetch('/events/', {
         method: 'POST',
@@ -117,7 +100,6 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
         setUntilDate('')
         setCount(10)
         setSelectedDays([])
-        setActivePreset(null)
       }
     } catch (error) {
       console.error('Error submitting event:', error)
@@ -159,7 +141,6 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
           required
           style={{ ...inputStyle, flexGrow: 1, minWidth: '100%' }}
         />
-        
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', width: '100%' }}>
           <input
             type="date"
@@ -186,15 +167,11 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
             Today
           </button>
         </div>
-
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', width: '100%', flexWrap: 'wrap' }}>
           <input
             type="time"
             value={startTime}
-            onChange={(e) => {
-              setStartTime(e.target.value)
-              setActivePreset(null)
-            }}
+            onChange={(e) => setStartTime(e.target.value)}
             style={{ ...inputStyle, flex: 1 }}
             title="Start Time"
           />
@@ -202,15 +179,11 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
           <input
             type="time"
             value={endTime}
-            onChange={(e) => {
-              setEndTime(e.target.value)
-              setActivePreset(null)
-            }}
+            onChange={(e) => setEndTime(e.target.value)}
             style={{ ...inputStyle, flex: 1 }}
             title="End Time"
           />
         </div>
-
         <textarea
           placeholder="Notes (optional)"
           value={notes}
@@ -219,7 +192,6 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
           style={{ ...inputStyle, width: '100%', resize: 'vertical' }}
         />
       </div>
-
       <RecurrenceBuilder
         freq={freq}
         setFreq={setFreq}
@@ -237,7 +209,6 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
         setMonthDay={setMonthDay}
         theme={theme}
       />
-
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', flexWrap: 'wrap' }}>
         <span style={{ fontWeight: 'bold', color: theme.subText }}>Duration presets:</span>
         <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
@@ -253,7 +224,7 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
               <button
                 type="button"
                 key={p.label}
-                onClick={() => applyDurationPreset(p.mins, p.label)}
+                onClick={() => applyPreset(p.mins, p.label)}
                 style={{
                   padding: '0.25rem 0.5rem',
                   border: `1px solid ${isActive ? theme.primary : theme.border}`,
@@ -272,7 +243,6 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
           })}
         </div>
       </div>
-
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
         <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Add to Calendars:</span>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -302,7 +272,6 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
           ))}
         </div>
       </div>
-
       <button
         type="submit"
         disabled={isSubmitting || selectedCalIds.length === 0}
