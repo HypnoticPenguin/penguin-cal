@@ -48,9 +48,6 @@ export default function UserSettingsModal({
   const [shareUsers, setShareUsers] = useState([])
   const [selectedShareCalId, setSelectedShareCalId] = useState(null)
 
-  // Export Feedback State mapping calendar id -> feedback text
-  const [exportStatuses, setExportStatuses] = useState({})
-
   useEffect(() => {
     if (currentUser) {
       setDisplayName(currentUser.display_name || currentUser.username || '')
@@ -75,7 +72,6 @@ export default function UserSettingsModal({
       setDeleteCalTarget(null)
       setSelectedShareCalId(null)
       setShareUsers([])
-      setExportStatuses({})
     }
   }, [isOpen])
 
@@ -184,7 +180,7 @@ export default function UserSettingsModal({
   }
 
   const handleExportCalendar = async (cal) => {
-    setExportStatuses((prev) => ({ ...prev, [cal.id]: 'Exporting...' }))
+    clearMessagesExcept('calendars')
     try {
       const token = localStorage.getItem('token')
       const res = await fetch(`/api/events/calendars/${cal.id}/export.ics`, {
@@ -203,34 +199,13 @@ export default function UserSettingsModal({
         a.remove()
         window.URL.revokeObjectURL(url)
 
-        setExportStatuses((prev) => ({ ...prev, [cal.id]: `Exported (${eventCount})!` }))
-        setTimeout(() => {
-          setExportStatuses((prev) => {
-            const copy = { ...prev }
-            delete copy[cal.id]
-            return copy
-          })
-        }, 3000)
+        setCalMsg({ text: `Successfully exported ${eventCount} events.`, isError: false })
       } else {
-        setExportStatuses((prev) => ({ ...prev, [cal.id]: 'Failed' }))
-        setTimeout(() => {
-          setExportStatuses((prev) => {
-            const copy = { ...prev }
-            delete copy[cal.id]
-            return copy
-          })
-        }, 3000)
+        setCalMsg({ text: 'Failed to export calendar.', isError: true })
       }
     } catch (err) {
       console.error('Export error:', err)
-      setExportStatuses((prev) => ({ ...prev, [cal.id]: 'Error' }))
-      setTimeout(() => {
-        setExportStatuses((prev) => {
-          const copy = { ...prev }
-          delete copy[cal.id]
-          return copy
-        })
-      }, 3000)
+      setCalMsg({ text: 'Network error during export.', isError: true })
     }
   }
 
@@ -464,86 +439,83 @@ export default function UserSettingsModal({
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {calendars.map((cal) => {
-              const exportStatus = exportStatuses[cal.id]
-              return (
-                <div
-                  key={cal.id}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    background: themeColors.bg,
-                    padding: '0.75rem',
-                    borderRadius: '6px',
-                    border: `1px solid ${themeColors.border}`
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: cal.color }}></span>
-                      <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{cal.name}</span>
-                      {cal.is_default && (
-                        <span style={{ fontSize: '0.75rem', background: themeColors.cardBg, color: themeColors.subText, padding: '0.1rem 0.4rem', borderRadius: '4px', border: `1px solid ${themeColors.border}` }}>
-                          Personal
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            {calendars.map((cal) => (
+              <div
+                key={cal.id}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  background: themeColors.bg,
+                  padding: '0.75rem',
+                  borderRadius: '6px',
+                  border: `1px solid ${themeColors.border}`
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: cal.color }}></span>
+                    <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{cal.name}</span>
+                    {cal.is_default && (
+                      <span style={{ fontSize: '0.75rem', background: themeColors.cardBg, color: themeColors.subText, padding: '0.1rem 0.4rem', borderRadius: '4px', border: `1px solid ${themeColors.border}` }}>
+                        Personal
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleExportCalendar(cal)}
+                      style={{ background: '#607d8b', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', minWidth: '60px', textAlign: 'center' }}
+                    >
+                      Export
+                    </button>
+                    {!cal.is_default && cal.is_owner && (
                       <button
                         type="button"
-                        onClick={() => handleExportCalendar(cal)}
-                        style={{ background: exportStatus ? '#4CAF50' : '#607d8b', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', minWidth: '85px', textAlign: 'center', transition: 'background 0.2s ease' }}
+                        onClick={() => fetchShares(cal.id)}
+                        style={{ background: themeColors.primary, color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', minWidth: '75px', textAlign: 'center' }}
                       >
-                        {exportStatus || 'Export'}
+                        {selectedShareCalId === cal.id ? 'Close' : 'Share'}
                       </button>
-                      {!cal.is_default && cal.is_owner && (
-                        <button
-                          type="button"
-                          onClick={() => fetchShares(cal.id)}
-                          style={{ background: themeColors.primary, color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', minWidth: '75px', textAlign: 'center' }}
-                        >
-                          {selectedShareCalId === cal.id ? 'Close' : 'Share'}
-                        </button>
-                      )}
-                      {!cal.is_default && cal.is_owner && (
-                        <button
-                          type="button"
-                          onClick={() => setDeleteCalTarget(cal)}
-                          style={{ background: '#d32f2f', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', minWidth: '60px', textAlign: 'center' }}
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </div>
+                    )}
+                    {!cal.is_default && cal.is_owner && (
+                      <button
+                        type="button"
+                        onClick={() => setDeleteCalTarget(cal)}
+                        style={{ background: '#d32f2f', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', minWidth: '60px', textAlign: 'center' }}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
-
-                  {/* Sharing expansion list */}
-                  {selectedShareCalId === cal.id && (
-                    <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: `1px dashed ${themeColors.border}` }}>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '0.4rem' }}>
-                        Share Calendar with Users:
-                      </span>
-                      {shareUsers.length === 0 ? (
-                        <p style={{ fontSize: '0.75rem', color: themeColors.subText, margin: 0 }}>No other users available to share with.</p>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                          {shareUsers.map((u) => (
-                            <label key={u.user_id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', cursor: 'pointer' }}>
-                              <input
-                                type="checkbox"
-                                checked={u.has_access}
-                                onChange={() => handleToggleShare(u.user_id, u.has_access)}
-                              />
-                              {u.display_name} <span style={{ color: themeColors.subText }}>(@{u.username})</span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
-              )
-            })}
+
+                {/* Sharing expansion list */}
+                {selectedShareCalId === cal.id && (
+                  <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: `1px dashed ${themeColors.border}` }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '0.4rem' }}>
+                      Share Calendar with Users:
+                    </span>
+                    {shareUsers.length === 0 ? (
+                      <p style={{ fontSize: '0.75rem', color: themeColors.subText, margin: 0 }}>No other users available to share with.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        {shareUsers.map((u) => (
+                          <label key={u.user_id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={u.has_access}
+                              onChange={() => handleToggleShare(u.user_id, u.has_access)}
+                            />
+                            {u.display_name} <span style={{ color: themeColors.subText }}>(@{u.username})</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
 
