@@ -32,5 +32,6 @@ class Event(SQLModel, table=True):
     start_time: Optional[str] = None
     end_time: Optional[str] = None
     notes: Optional[str] = None
+    priority: Optional[str] = Field(default="medium")
     rrule: Optional[str] = None
     exdates: Optional[str] = None

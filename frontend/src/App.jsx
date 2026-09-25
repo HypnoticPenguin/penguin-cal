@@ -18,36 +18,52 @@ export default function App() {
   const [selectedDate, setSelectedDate] = useState('')
   const [modalEvent, setModalEvent] = useState(null)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
-  const [themeKey, setThemeKey] = useState('light')
+  const [themeKey, setThemeKey] = useState('auto')
   const [dateFormat, setDateFormat] = useState('YYYY-MM-DD')
   const [searchQuery, setSearchQuery] = useState('')
-  
   const calendarRef = useRef(null)
+
+  // System preference listener for 'auto' theme mode
+  const [systemPrefDark, setSystemPrefDark] = useState(
+    window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : false
+  )
+
+  useEffect(() => {
+    if (!window.matchMedia) return
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    const handleChange = (e) => setSystemPrefDark(e.matches)
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [])
+
+  const resolvedTheme = themeKey === 'auto'
+    ? (systemPrefDark ? themes.dark : themes.light)
+    : (themes[themeKey] || themes.light)
+
   const todayObj = new Date()
   const todayStr = todayObj.toISOString().slice(0, 10)
   const futureObj = new Date()
   futureObj.setMonth(futureObj.getMonth() + 3)
   const futureStr = futureObj.toISOString().slice(0, 10)
+
   const [filterStartDate, setFilterStartDate] = useState(todayStr)
   const [filterEndDate, setFilterEndDate] = useState(futureStr)
-
-  const currentTheme = themes[themeKey] || themes.light
 
   useEffect(() => {
     if (currentUser) {
       const storageKey = `theme_${currentUser.id}`
       let userSavedTheme = localStorage.getItem(storageKey)
-      
+             
       if (!userSavedTheme) {
-        userSavedTheme = 'light'
-        localStorage.setItem(storageKey, 'light')
+        userSavedTheme = 'auto'
+        localStorage.setItem(storageKey, 'auto')
       }
-      
+             
       setThemeKey(userSavedTheme)
       const userSavedFormat = localStorage.getItem(`dateFormat_${currentUser.id}`) || 'YYYY-MM-DD'
       setDateFormat(userSavedFormat)
     } else {
-      setThemeKey('light')
+      setThemeKey('auto')
       setDateFormat('YYYY-MM-DD')
     }
   }, [currentUser])
@@ -67,11 +83,11 @@ export default function App() {
   }
 
   useEffect(() => {
-    document.body.style.backgroundColor = currentTheme.bg
-    document.body.style.color = currentTheme.text
+    document.body.style.backgroundColor = resolvedTheme.bg
+    document.body.style.color = resolvedTheme.text
     document.body.style.margin = '0'
     document.body.style.transition = 'background-color 0.3s ease, color 0.3s ease'
-  }, [currentTheme])
+  }, [resolvedTheme])
 
   const fetchCalendars = async () => {
     try {
@@ -79,11 +95,20 @@ export default function App() {
       if (res.ok) {
         const data = await res.json()
         setCalendars(data)
-        setActiveCalendarIds((prev) => {
-          if (prev.length === 0) return data.map((c) => c.id)
-          const newIds = data.map(c => c.id).filter(id => !prev.includes(id))
-          return [...prev, ...newIds]
-        })
+        
+        // Restore persisted calendar visibility if available, otherwise default to all active
+        if (currentUser) {
+          const savedCals = localStorage.getItem(`active_cals_${currentUser.id}`)
+          if (savedCals) {
+            try {
+              const parsed = JSON.parse(savedCals)
+              const validIds = parsed.filter(id => data.some(c => c.id === id))
+              setActiveCalendarIds(validIds)
+              return
+            } catch (e) {}
+          }
+        }
+        setActiveCalendarIds(data.map((c) => c.id))
       }
     } catch (err) {
       console.error('Failed to fetch calendars:', err)
@@ -125,9 +150,13 @@ export default function App() {
   }, [token])
 
   const handleToggleCalendar = (calId) => {
-    setActiveCalendarIds((prev) =>
-      prev.includes(calId) ? prev.filter((id) => id !== calId) : [...prev, calId]
-    )
+    setActiveCalendarIds((prev) => {
+      const next = prev.includes(calId) ? prev.filter((id) => id !== calId) : [...prev, calId]
+      if (currentUser) {
+        localStorage.setItem(`active_cals_${currentUser.id}`, JSON.stringify(next))
+      }
+      return next
+    })
   }
 
   const handleLogout = () => {
@@ -137,7 +166,7 @@ export default function App() {
     setEvents([])
     setCalendars([])
     setActiveCalendarIds([])
-    setThemeKey('light')
+    setThemeKey('auto')
     setDateFormat('YYYY-MM-DD')
   }
 
@@ -160,16 +189,16 @@ export default function App() {
           }
         `}</style>
         <div style={{ flex: 1 }}>
-          <AuthForm onAuthSuccess={() => setToken(localStorage.getItem('token'))} theme={currentTheme} />
+          <AuthForm onAuthSuccess={() => setToken(localStorage.getItem('token'))} theme={resolvedTheme} />
         </div>
         <footer
           style={{
             textAlign: 'center',
             padding: '1rem',
-            borderTop: `1px solid ${currentTheme.border}`,
-            color: currentTheme.subText,
+            borderTop: `1px solid ${resolvedTheme.border}`,
+            color: resolvedTheme.subText,
             fontSize: '0.85rem',
-            background: currentTheme.cardBg,
+            background: resolvedTheme.cardBg,
             transition: 'all 0.3s ease'
           }}
         >
@@ -191,7 +220,7 @@ export default function App() {
     if (filterEndDate && evt.date > filterEndDate) {
       return false
     }
-    
+         
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       const matchesTitle = evt.title && evt.title.toLowerCase().includes(query)
@@ -200,7 +229,6 @@ export default function App() {
         return false
       }
     }
-
     return true
   }).sort((a, b) => a.date.localeCompare(b.date))
 
@@ -285,7 +313,7 @@ export default function App() {
             </span>
             <button
               onClick={() => setShowSettingsModal(true)}
-              style={{ padding: '0.4rem 0.8rem', background: currentTheme.primary, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+              style={{ padding: '0.4rem 0.8rem', background: resolvedTheme.primary, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
             >
               Settings
             </button>
@@ -301,12 +329,12 @@ export default function App() {
         {/* Calendar visibility filter chips */}
         <div
           style={{
-            background: currentTheme.cardBg,
-            color: currentTheme.text,
+            background: resolvedTheme.cardBg,
+            color: resolvedTheme.text,
             padding: '1rem',
             borderRadius: '8px',
             marginBottom: '1.5rem',
-            border: `1px solid ${currentTheme.border}`,
+            border: `1px solid ${resolvedTheme.border}`,
             boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
             transition: 'all 0.3s ease',
             boxSizing: 'border-box'
@@ -315,16 +343,16 @@ export default function App() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div>
               <h3 style={{ margin: '0 0 0.2rem 0', fontSize: '1.1rem' }}>Calendars</h3>
-              <p style={{ margin: 0, fontSize: '0.8rem', color: currentTheme.subText }}>
-                Check boxes to toggle calendar visibility. Manage or add calendars in Settings.
+              <p style={{ margin: 0, fontSize: '0.8rem', color: resolvedTheme.subText }}>
+                Check boxes to toggle calendar visibility. Manage or add calendars in Settings or click Manage Calendars.
               </p>
             </div>
             <button
               type="button"
               onClick={() => setShowSettingsModal(true)}
-              style={{ padding: '0.35rem 0.7rem', background: currentTheme.primary, color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 'bold' }}
+              style={{ padding: '0.35rem 0.7rem', background: resolvedTheme.primary, color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 'bold' }}
             >
-              ⚙ Manage Calendars
+                Manage Calendars
             </button>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
@@ -340,10 +368,10 @@ export default function App() {
                     gap: '0.4rem',
                     fontSize: '0.85rem',
                     cursor: 'pointer',
-                    background: isVisible ? `${cal.color}15` : currentTheme.bg,
+                    background: isVisible ? `${cal.color}15` : resolvedTheme.bg,
                     padding: '0.3rem 0.6rem',
                     borderRadius: '6px',
-                    border: `1px solid ${isVisible ? cal.color : currentTheme.border}`,
+                    border: `1px solid ${isVisible ? cal.color : resolvedTheme.border}`,
                     transition: 'all 0.2s ease'
                   }}
                 >
@@ -362,12 +390,12 @@ export default function App() {
         </div>
 
         <h2>Create New Event</h2>
-        <EventForm calendars={calendars} theme={currentTheme} onEventAdded={fetchEvents} defaultDate={selectedDate} />
+        <EventForm calendars={calendars} theme={resolvedTheme} onEventAdded={fetchEvents} defaultDate={selectedDate} />
 
         <CalendarView
           calendarRef={calendarRef}
           events={visibleEvents}
-          themeColors={currentTheme}
+          themeColors={resolvedTheme}
           dateFormat={dateFormat}
           highlightedDate={selectedDate}
           onDateSelect={(dateStr) => setSelectedDate(dateStr)}
@@ -377,7 +405,6 @@ export default function App() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2rem', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
           <h2 style={{ margin: 0 }}>Events</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem' }}>
               <input
                 type="text"
@@ -386,9 +413,9 @@ export default function App() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{
                   padding: '0.3rem 0.5rem',
-                  background: currentTheme.cardBg,
-                  color: currentTheme.text,
-                  border: `1px solid ${currentTheme.border}`,
+                  background: resolvedTheme.cardBg,
+                  color: resolvedTheme.text,
+                  border: `1px solid ${resolvedTheme.border}`,
                   borderRadius: '4px',
                   width: '150px'
                 }}
@@ -399,8 +426,8 @@ export default function App() {
                   style={{
                     padding: '0.25rem 0.4rem',
                     background: 'transparent',
-                    color: currentTheme.subText,
-                    border: `1px solid ${currentTheme.border}`,
+                    color: resolvedTheme.subText,
+                    border: `1px solid ${resolvedTheme.border}`,
                     borderRadius: '4px',
                     cursor: 'pointer',
                     fontSize: '0.75rem'
@@ -410,29 +437,28 @@ export default function App() {
                 </button>
               )}
             </div>
-
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem' }}>
-              <span style={{ fontWeight: 'bold', color: currentTheme.subText }}>From:</span>
+              <span style={{ fontWeight: 'bold', color: resolvedTheme.subText }}>From:</span>
               <input
                 type="date"
                 value={filterStartDate}
                 onChange={(e) => setFilterStartDate(e.target.value)}
-                style={{ padding: '0.25rem 0.4rem', background: currentTheme.cardBg, color: currentTheme.text, border: `1px solid ${currentTheme.border}`, borderRadius: '4px' }}
+                style={{ padding: '0.25rem 0.4rem', background: resolvedTheme.cardBg, color: resolvedTheme.text, border: `1px solid ${resolvedTheme.border}`, borderRadius: '4px' }}
               />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem' }}>
-              <span style={{ fontWeight: 'bold', color: currentTheme.subText }}>To:</span>
+              <span style={{ fontWeight: 'bold', color: resolvedTheme.subText }}>To:</span>
               <input
                 type="date"
                 value={filterEndDate}
                 onChange={(e) => setFilterEndDate(e.target.value)}
-                style={{ padding: '0.25rem 0.4rem', background: currentTheme.cardBg, color: currentTheme.text, border: `1px solid ${currentTheme.border}`, borderRadius: '4px' }}
+                style={{ padding: '0.25rem 0.4rem', background: resolvedTheme.cardBg, color: resolvedTheme.text, border: `1px solid ${resolvedTheme.border}`, borderRadius: '4px' }}
               />
             </div>
             {(filterStartDate !== todayStr || filterEndDate !== futureStr) && (
               <button
                 onClick={() => { setFilterStartDate(todayStr); setFilterEndDate(futureStr); }}
-                style={{ padding: '0.25rem 0.5rem', background: 'transparent', color: currentTheme.primary, border: `1px solid ${currentTheme.primary}`, borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+                style={{ padding: '0.25rem 0.5rem', background: 'transparent', color: resolvedTheme.primary, border: `1px solid ${resolvedTheme.primary}`, borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
               >
                 Reset Dates
               </button>
@@ -447,7 +473,7 @@ export default function App() {
                 key={`${evt.id}-${evt.date}`}
                 event={evt}
                 calendars={calendars}
-                theme={currentTheme}
+                theme={resolvedTheme}
                 dateFormat={dateFormat}
                 onGoToCalendar={(dateStr) => {
                   window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -467,7 +493,7 @@ export default function App() {
               />
             ))
           ) : (
-            <p style={{ color: currentTheme.subText }}>No events found matching your search or date range.</p>
+            <p style={{ color: resolvedTheme.subText }}>No events found matching your search or date range.</p>
           )}
         </ul>
 
@@ -475,7 +501,7 @@ export default function App() {
           isOpen={Boolean(modalEvent)}
           event={modalEvent}
           calendars={calendars}
-          theme={currentTheme}
+          theme={resolvedTheme}
           onClose={() => setModalEvent(null)}
           onSave={async (id, updatedData) => {
             await apiFetch(`/events/${id}`, {
@@ -499,7 +525,7 @@ export default function App() {
           onClose={() => setShowSettingsModal(false)}
           currentUser={currentUser}
           currentTheme={themeKey}
-          themeColors={currentTheme}
+          themeColors={resolvedTheme}
           dateFormat={dateFormat}
           calendars={calendars}
           onThemeChange={handleThemeChange}
@@ -518,10 +544,10 @@ export default function App() {
           textAlign: 'center',
           padding: '1rem',
           marginTop: 'auto',
-          borderTop: `1px solid ${currentTheme.border}`,
-          color: currentTheme.subText,
+          borderTop: `1px solid ${resolvedTheme.border}`,
+          color: resolvedTheme.subText,
           fontSize: '0.85rem',
-          background: currentTheme.cardBg,
+          background: resolvedTheme.cardBg,
           transition: 'all 0.3s ease'
         }}
       >

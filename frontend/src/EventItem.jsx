@@ -12,13 +12,17 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
   const [title, setTitle] = useState(event.title)
   const [date, setDate] = useState(event.date)
   const [notes, setNotes] = useState(event.notes || '')
+  const [priority, setPriority] = useState(event.priority || 'medium')
   
   const {
     startTime,
     setStartTime,
     endTime,
     setEndTime,
-    validateTimes
+    activePreset,
+    applyPreset,
+    validateTimes,
+    timeError
   } = useEventTime()
 
   const [freq, setFreq] = useState('')
@@ -37,7 +41,7 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
   const handleStartEdit = () => {
     setStartTime(event.start_time || event.time || '')
     setEndTime(event.end_time || '')
-
+    setPriority(event.priority || 'medium')
     const rruleStr = event.rrule || ''
     if (rruleStr) {
       const parts = rruleStr.split(';').reduce((acc, part) => {
@@ -72,7 +76,6 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
 
   const handleSave = async () => {
     if (!validateTimes()) return
-
     try {
       const response = await apiFetch(`/events/${event.id}`, {
         method: 'PUT',
@@ -82,6 +85,7 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
           start_time: startTime || null,
           end_time: endTime || null,
           notes: notes || null,
+          priority,
           rrule: buildRruleString({ freq, interval, endType, untilDate, count, selectedDays, monthDay })
         }),
       })
@@ -104,7 +108,7 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
 
   const formatTimeDisplay = () => {
     const s = event.start_time || event.time
-    if (!s) return ''
+    if (!s) return ' (All-day)'
     if (event.end_time) {
       return ` @ ${s} - ${event.end_time}`
     }
@@ -113,7 +117,6 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
 
   const getRecurrenceText = () => {
     if (!event.rrule) return 'Recurring'
-
     const freqMatch = event.rrule.match(/FREQ=([A-Z]+)/)
     let freqLabel = 'Recurring'
     if (freqMatch) {
@@ -128,7 +131,6 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
       const dtstart = new Date(startTimeVal ? `${event.date}T${startTimeVal}:00` : `${event.date}T00:00:00`)
       const rule = RRule.fromString(`DTSTART:${dtstart.toISOString().replace(/[-:]/g, '').split('.')[0]}Z\nRRULE:${event.rrule}`)
       const allDates = rule.all()
-
       if (allDates.length > 0) {
         const lastDate = allDates[allDates.length - 1]
         const year = lastDate.getUTCFullYear()
@@ -149,13 +151,68 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
         {isEditing ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flexGrow: 1, marginRight: '1rem' }}>
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} style={{ padding: '0.4rem', background: theme.cardBg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '4px' }} />
+            
+            {timeError && (
+              <div style={{ padding: '0.4rem', background: 'rgba(211, 47, 47, 0.1)', color: '#d32f2f', border: '1px solid #d32f2f', borderRadius: '4px', fontSize: '0.85rem' }}>
+                {timeError}
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
               <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ padding: '0.4rem', background: theme.cardBg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '4px' }} />
               <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={{ padding: '0.4rem', background: theme.cardBg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '4px' }} title="Start Time" />
               <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={{ padding: '0.4rem', background: theme.cardBg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '4px' }} title="End Time" />
             </div>
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes..." rows={2} style={{ padding: '0.4rem', background: theme.cardBg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '4px', resize: 'vertical' }} />
 
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', flexWrap: 'wrap' }}>
+              <span style={{ fontWeight: 'bold', color: theme.subText }}>Duration presets:</span>
+              <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                {[
+                  { label: 'All Day', mins: 'ALL_DAY' },
+                  { label: '+30m', mins: 30 },
+                  { label: '+1 hr', mins: 60 },
+                  { label: '+2 hrs', mins: 120 },
+                  { label: '+4 hrs', mins: 240 }
+                ].map((p) => {
+                  const isActive = activePreset === p.label
+                  return (
+                    <button
+                      type="button"
+                      key={p.label}
+                      onClick={() => applyPreset(p.mins, p.label)}
+                      style={{
+                        padding: '0.25rem 0.5rem',
+                        border: `1px solid ${isActive ? theme.primary : theme.border}`,
+                        borderRadius: '4px',
+                        background: isActive ? theme.primary : theme.bg,
+                        color: isActive ? '#fff' : theme.text,
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        fontWeight: isActive ? 'bold' : 'normal',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+              <span style={{ fontWeight: 'bold', color: theme.subText }}>Priority:</span>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value)}
+                style={{ padding: '0.4rem', background: theme.cardBg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '4px' }}
+              >
+                <option value="low">🟢 Low</option>
+                <option value="medium">🟡 Medium</option>
+                <option value="high">🔴 High</option>
+              </select>
+            </div>
+
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes..." rows={2} style={{ padding: '0.4rem', background: theme.cardBg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '4px', resize: 'vertical' }} />
             <RecurrenceBuilder
               freq={freq}
               setFreq={setFreq}
@@ -180,6 +237,26 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
               <span>
                 <strong>{formatDate(event.date, dateFormat)}{formatTimeDisplay()}:</strong> {event.title}
               </span>
+              
+              {/* Priority Flag Badge */}
+              {event.priority && event.priority !== 'medium' && (
+                <span
+                  style={{
+                    backgroundColor: event.priority === 'high' ? 'rgba(211, 47, 47, 0.15)' : 'rgba(76, 175, 80, 0.15)',
+                    color: event.priority === 'high' ? '#d32f2f' : '#388e3c',
+                    border: `1px solid ${event.priority === 'high' ? '#d32f2f' : '#388e3c'}`,
+                    padding: '0.1rem 0.4rem',
+                    borderRadius: '4px',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.2rem'
+                  }}
+                >
+                  {event.priority === 'high' ? '🔴 High' : '🟢 Low'}
+                </span>
+              )}
 
               {assignedCalendars.map((cal) => (
                 <span

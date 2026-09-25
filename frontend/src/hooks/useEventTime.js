@@ -5,11 +5,11 @@ export function useEventTime(initialStartTime = '', initialEndTime = '') {
   const [endTime, setEndTime] = useState(initialEndTime)
   const [activePreset, setActivePreset] = useState(null)
   const [durationMinutes, setDurationMinutes] = useState(null)
+  const [timeError, setTimeError] = useState('')
 
   const handleStartTimeChange = (newStart) => {
     setStartTime(newStart)
-    setActivePreset(null)
-    // Automatically shift end time if a duration preset is active
+    setTimeError('')
     if (durationMinutes && durationMinutes !== 'ALL_DAY' && newStart) {
       const [h, m] = newStart.split(':').map(Number)
       const end = new Date()
@@ -20,9 +20,23 @@ export function useEventTime(initialStartTime = '', initialEndTime = '') {
     }
   }
 
+  const handleEndTimeChange = (newEnd) => {
+    setEndTime(newEnd)
+    setTimeError('')
+    if (durationMinutes && durationMinutes !== 'ALL_DAY' && newEnd) {
+      const [h, m] = newEnd.split(':').map(Number)
+      const start = new Date()
+      start.setHours(h, m - durationMinutes, 0, 0)
+      setStartTime(
+        `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`
+      )
+    }
+  }
+
   const applyPreset = (minutes, label) => {
     setActivePreset(label)
     setDurationMinutes(minutes)
+    setTimeError('')
     if (minutes === 'ALL_DAY') {
       setStartTime('')
       setEndTime('')
@@ -42,15 +56,15 @@ export function useEventTime(initialStartTime = '', initialEndTime = '') {
     if (startTime && endTime) {
       const [startHours, startMinutes] = startTime.split(':').map(Number)
       const [endHours, endMinutes] = endTime.split(':').map(Number)
-      
+             
       const startTotalMins = startHours * 60 + startMinutes
       const endTotalMins = endHours * 60 + endMinutes
-
       if (startTotalMins >= endTotalMins) {
-        alert("End time must be later than the start time.")
+        setTimeError("End time must be later than the start time.")
         return false
       }
     }
+    setTimeError('')
     return true
   }
 
@@ -58,9 +72,11 @@ export function useEventTime(initialStartTime = '', initialEndTime = '') {
     startTime,
     setStartTime: handleStartTimeChange,
     endTime,
-    setEndTime,
+    setEndTime: handleEndTimeChange,
     activePreset,
     applyPreset,
-    validateTimes
+    validateTimes,
+    timeError,
+    setTimeError
   }
 }

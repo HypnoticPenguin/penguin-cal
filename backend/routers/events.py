@@ -1,9 +1,9 @@
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
+from fastapi.responses import Response
 from sqlmodel import Session, select
-from icalendar import Calendar as ICalCalendar
-
+from icalendar import Calendar as ICalCalendar, Event as ICalEvent
 from database import get_session
 from models import User, Calendar, CalendarShare, Event, EventCalendarLink
 from schemas import EventCreate, EventUpdate
@@ -52,6 +52,7 @@ def get_events(
             "start_time": event.start_time,
             "end_time": event.end_time,
             "notes": event.notes,
+            "priority": event.priority or "medium",
             "rrule": event.rrule,
             "exdates": exdates_list,
             "calendar_ids": cal_ids,
@@ -76,6 +77,7 @@ def create_event(
         start_time=event_data.start_time if event_data.start_time else None,
         end_time=event_data.end_time if event_data.end_time else None,
         notes=event_data.notes if event_data.notes else None,
+        priority=event_data.priority if event_data.priority else "medium",
         rrule=event_data.rrule if event_data.rrule else None,
         exdates=None
     )
@@ -106,6 +108,7 @@ def update_event(
     event.start_time = updated_event.start_time if updated_event.start_time else None
     event.end_time = updated_event.end_time if updated_event.end_time else None
     event.notes = updated_event.notes if updated_event.notes else None
+    event.priority = updated_event.priority if updated_event.priority else "medium"
     event.rrule = updated_event.rrule if updated_event.rrule else None
     session.add(event)
     
@@ -152,6 +155,82 @@ def delete_event(
         session.commit()
         return {"message": "Entire series deleted"}
 
+@router.get("/calendars/{calendar_id}/export.ics")
+def export_calendar_ics(
+    calendar_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    cal = session.get(Calendar, calendar_id)
+    if not cal:
+        raise HTTPException(status_code=404, detail="Calendar not found")
+        
+    is_owner = (cal.owner_id == current_user.id)
+    if not is_owner:
+        share = session.exec(
+            select(CalendarShare).where(
+                CalendarShare.calendar_id == calendar_id,
+                CalendarShare.shared_with_user_id == current_user.id
+            )
+        ).first()
+        if not share:
+            raise HTTPException(status_code=403, detail="Access denied to this calendar")
+
+    links = session.exec(select(EventCalendarLink).where(EventCalendarLink.calendar_id == calendar_id)).all()
+    event_ids = [l.event_id for l in links]
+    
+    events = []
+    if event_ids:
+        events = session.exec(select(Event).where(Event.id.in_(event_ids))).all()
+
+    ical_cal = ICalCalendar()
+    ical_cal.add('prodid', '-//Penguin Cal//Calendar Export//EN')
+    ical_cal.add('version', '2.0')
+    ical_cal.add('calscale', 'GREGORIAN')
+    ical_cal.add('x-wr-calname', cal.name)
+
+    for event in events:
+        ical_event = ICalEvent()
+        ical_event.add('summary', event.title)
+        
+        date_parts = [int(p) for p in event.date.split('-')]
+        event_date = datetime(date_parts[0], date_parts[1], date_parts[2])
+
+        if event.start_time:
+            start_h, start_m = map(int, event.start_time.split(':'))
+            start_dt = event_date.replace(hour=start_h, minute=start_m)
+            ical_event.add('dtstart', start_dt)
+            
+            if event.end_time:
+                end_h, end_m = map(int, event.end_time.split(':'))
+                end_dt = event_date.replace(hour=end_h, minute=end_m)
+                ical_event.add('dtend', end_dt)
+            else:
+                ical_event.add('dtend', start_dt.replace(hour=start_h + 1))
+        else:
+            ical_event.add('dtstart', event_date.date())
+            ical_event.add('dtend', event_date.date())
+
+        if event.notes:
+            ical_event.add('description', event.notes)
+            
+        if event.rrule:
+            ical_event.add('rrule', event.rrule)
+
+        ical_cal.add_component(ical_event)
+
+    ics_data = ical_cal.to_ical()
+    filename = f"{cal.name.lower().replace(' ', '_')}_export.ics"
+
+    return Response(
+        content=ics_data,
+        media_type="text/calendar",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "X-Event-Count": str(len(events))
+        }
+    )
+
 @router.post("/import-ics")
 def import_ics_events(
     calendar_id: int = Form(...),
@@ -195,6 +274,7 @@ def import_ics_events(
                 start_time=time_str,
                 end_time=end_time_str,
                 notes=description if description else None,
+                priority="medium",
                 rrule=None
             )
             session.add(db_event)

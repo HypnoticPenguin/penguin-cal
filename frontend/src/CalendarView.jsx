@@ -31,15 +31,17 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
   const fcEvents = events.map((evt) => {
     const startDateTime = evt.start_time ? `${evt.date}T${evt.start_time}` : evt.date
     const endDateTime = evt.end_time ? `${evt.date}T${evt.end_time}` : undefined
-
     let calendarColor = '#2196F3'
     if (evt.calendar && evt.calendar.color) {
       calendarColor = evt.calendar.color
     }
 
+    // Add priority prefix symbol for calendar view blocks
+    const priorityPrefix = evt.priority === 'high' ? '🔴 ' : evt.priority === 'low' ? '🟢 ' : ''
+
     return {
       id: String(evt.id),
-      title: evt.title,
+      title: `${priorityPrefix}${evt.title}`,
       start: startDateTime,
       end: endDateTime,
       allDay: !evt.start_time && !evt.end_time,

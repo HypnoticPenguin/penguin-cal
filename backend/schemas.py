@@ -36,6 +36,7 @@ class EventCreate(BaseModel):
     start_time: Optional[str] = None
     end_time: Optional[str] = None
     notes: Optional[str] = None
+    priority: Optional[str] = "medium"
     calendar_ids: List[int]
     rrule: Optional[str] = None
 
@@ -45,6 +46,7 @@ class EventUpdate(BaseModel):
     start_time: Optional[str] = None
     end_time: Optional[str] = None
     notes: Optional[str] = None
+    priority: Optional[str] = "medium"
     calendar_ids: Optional[List[int]] = None
     rrule: Optional[str] = None
 

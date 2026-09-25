@@ -73,7 +73,10 @@ export const themes = {
   }
 }
 
-export const themeList = Object.keys(themes).map((key) => ({
-  key,
-  name: themes[key].name
-}))
+export const themeList = [
+  { key: 'auto', name: 'System Auto (Dark/Light)' },
+  ...Object.keys(themes).map((key) => ({
+    key,
+    name: themes[key].name
+  }))
+]
