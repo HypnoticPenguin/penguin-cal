@@ -1,83 +1,52 @@
 import { useState } from 'react'
-import { RRule } from 'rrule'
-import { apiFetch, formatDate } from './api.js'
-import DeleteModal from './DeleteModal.jsx'
-import RecurrenceBuilder from './RecurrenceBuilder.jsx'
-import { useEventTime } from './hooks/useEventTime.js'
-import { buildRruleString } from './utils/recurrence.js'
+import { apiFetch } from './api.js'
+import ConfirmModal from './ConfirmModal.jsx'
 
-export default function EventItem({ event, calendars = [], theme, dateFormat, onDelete, onUpdate, onGoToCalendar }) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
+export default function EventItem({ event, calendars, theme, dateFormat, onGoToCalendar, onDelete, onUpdate }) {
+  const [showEdit, setShowEdit] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteType, setDeleteType] = useState('all') // 'all' or 'single'
+
   const [title, setTitle] = useState(event.title)
   const [date, setDate] = useState(event.date)
+  const [startTime, setStartTime] = useState(event.start_time || '')
+  const [endTime, setEndTime] = useState(event.end_time || '')
   const [notes, setNotes] = useState(event.notes || '')
   const [priority, setPriority] = useState(event.priority || 'medium')
-  
-  const {
-    startTime,
-    setStartTime,
-    endTime,
-    setEndTime,
-    activePreset,
-    applyPreset,
-    validateTimes,
-    timeError
-  } = useEventTime()
+  const [selectedCalIds, setSelectedCalIds] = useState(event.calendar_ids || [])
 
-  const [freq, setFreq] = useState('')
-  const [interval, setInterval] = useState(1)
-  const [endType, setEndType] = useState('never')
-  const [untilDate, setUntilDate] = useState('')
-  const [count, setCount] = useState(10)
-  const [selectedDays, setSelectedDays] = useState([])
-  const [monthDay, setMonthDay] = useState(1)
+  const isAllDay = !event.start_time && !event.end_time
+  const priorityEmoji = event.priority === 'high' ? '🔴 ' : event.priority === 'low' ? '🟢 ' : ''
 
-  const isRecurring = event.is_recurring || Boolean(event.rrule)
-  const assignedCalendars = calendars.filter(
-    (c) => event.calendar_ids && event.calendar_ids.includes(c.id)
-  )
+  const formatDisplayDate = (dateStr) => {
+    if (!dateStr) return ''
+    const [y, m, d] = dateStr.split('-')
+    if (!y || !m || !d) return dateStr
 
-  const handleStartEdit = () => {
-    setStartTime(event.start_time || event.time || '')
-    setEndTime(event.end_time || '')
-    setPriority(event.priority || 'medium')
-    const rruleStr = event.rrule || ''
-    if (rruleStr) {
-      const parts = rruleStr.split(';').reduce((acc, part) => {
-        const [k, v] = part.split('=')
-        acc[k] = v
-        return acc
-      }, {})
-      setFreq(parts.FREQ || '')
-      setInterval(parts.INTERVAL ? Number(parts.INTERVAL) : 1)
-      if (parts.UNTIL) {
-        setEndType('until')
-        const u = parts.UNTIL
-        setUntilDate(`${u.slice(0, 4)}-${u.slice(4, 6)}-${u.slice(6, 8)}`)
-      } else if (parts.COUNT) {
-        setEndType('count')
-        setCount(Number(parts.COUNT))
-      } else {
-        setEndType('never')
-      }
-      if (parts.BYDAY) setSelectedDays(parts.BYDAY.split(','))
-      if (parts.BYMONTHDAY) setMonthDay(Number(parts.BYMONTHDAY))
-    } else {
-      setFreq('')
-      setInterval(1)
-      setEndType('never')
-      setUntilDate('')
-      setCount(10)
-      setSelectedDays([])
+    if (dateFormat === 'DD-MM-YYYY') {
+      return `${d}-${m}-${y}`
+    } else if (dateFormat === 'DD-Mon-YYYY') {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+      const monthName = months[parseInt(m, 10) - 1] || m
+      return `${d}-${monthName}-${y}`
     }
-    setIsEditing(true)
+    return dateStr // Default YYYY-MM-DD
   }
 
-  const handleSave = async () => {
-    if (!validateTimes()) return
+  const formatDisplayTime = (timeStr) => {
+    if (!timeStr) return ''
+    const [h, m] = timeStr.split(':')
+    const hourNum = parseInt(h, 10)
+    if (isNaN(hourNum)) return timeStr
+    const meridiem = hourNum >= 12 ? 'PM' : 'AM'
+    const formattedHour = hourNum % 12 === 0 ? 12 : hourNum % 12
+    return `${formattedHour}:${m} ${meridiem}`
+  }
+
+  const handleUpdateSubmit = async (e) => {
+    e.preventDefault()
     try {
-      const response = await apiFetch(`/events/${event.id}`, {
+      const res = await apiFetch(`/events/${event.id}`, {
         method: 'PUT',
         body: JSON.stringify({
           title,
@@ -86,256 +55,255 @@ export default function EventItem({ event, calendars = [], theme, dateFormat, on
           end_time: endTime || null,
           notes: notes || null,
           priority,
-          rrule: buildRruleString({ freq, interval, endType, untilDate, count, selectedDays, monthDay })
-        }),
+          calendar_ids: selectedCalIds,
+          rrule: event.rrule
+        })
       })
-      if (response.ok) {
-        onUpdate()
-        setIsEditing(false)
+      if (res.ok) {
+        setShowEdit(false)
+        if (onUpdate) onUpdate()
       }
     } catch (err) {
-      console.error('Error updating event:', err)
+      console.error('Failed to update event', err)
     }
   }
 
-  const handleDeleteClick = () => {
-    if (isRecurring) {
-      setShowDeleteModal(true)
-    } else {
-      onDelete(event.id, 'all')
-    }
+  const toggleCalendarSelection = (calId) => {
+    setSelectedCalIds((prev) =>
+      prev.includes(calId) ? prev.filter((id) => id !== calId) : [...prev, calId]
+    )
   }
 
-  const formatTimeDisplay = () => {
-    const s = event.start_time || event.time
-    if (!s) return ' (All-day)'
-    if (event.end_time) {
-      return ` @ ${s} - ${event.end_time}`
-    }
-    return ` @ ${s}`
+  const inputStyle = {
+    padding: '0.4rem',
+    background: theme.bg,
+    color: theme.text,
+    border: `1px solid ${theme.border}`,
+    borderRadius: '4px',
+    boxSizing: 'border-box',
+    fontSize: '0.85rem'
   }
 
-  const getRecurrenceText = () => {
-    if (!event.rrule) return 'Recurring'
-    const freqMatch = event.rrule.match(/FREQ=([A-Z]+)/)
-    let freqLabel = 'Recurring'
-    if (freqMatch) {
-      const rawFreq = freqMatch[1].toLowerCase()
-      freqLabel = rawFreq.charAt(0).toUpperCase() + rawFreq.slice(1)
-    }
-    if (!event.rrule.includes('UNTIL=') && !event.rrule.includes('COUNT=')) {
-      return `${freqLabel}, repeats indefinitely`
-    }
-    try {
-      const startTimeVal = event.start_time || event.time
-      const dtstart = new Date(startTimeVal ? `${event.date}T${startTimeVal}:00` : `${event.date}T00:00:00`)
-      const rule = RRule.fromString(`DTSTART:${dtstart.toISOString().replace(/[-:]/g, '').split('.')[0]}Z\nRRULE:${event.rrule}`)
-      const allDates = rule.all()
-      if (allDates.length > 0) {
-        const lastDate = allDates[allDates.length - 1]
-        const year = lastDate.getUTCFullYear()
-        const month = String(lastDate.getUTCMonth() + 1).padStart(2, '0')
-        const day = String(lastDate.getUTCDate()).padStart(2, '0')
-        const formattedEndDate = formatDate(`${year}-${month}-${day}`, dateFormat)
-        return `${freqLabel}, ends on ${formattedEndDate}`
-      }
-    } catch (err) {
-      console.error('Failed to parse recurrence end date:', err)
-    }
-    return freqLabel
+  if (showEdit) {
+    return (
+      <li
+        style={{
+          background: theme.cardBg,
+          color: theme.text,
+          padding: '1rem',
+          borderRadius: '8px',
+          marginBottom: '0.75rem',
+          border: `1px solid ${theme.border}`,
+          boxSizing: 'border-box'
+        }}
+      >
+        <form onSubmit={handleUpdateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <h4 style={{ margin: '0 0 0.2rem 0', fontSize: '1rem' }}>Edit Event</h4>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+            style={inputStyle}
+          />
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              required
+              style={{ ...inputStyle, flex: 1 }}
+            />
+            <input
+              type="time"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+              style={{ ...inputStyle, flex: 1 }}
+            />
+            <input
+              type="time"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+              style={{ ...inputStyle, flex: 1 }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+            <span style={{ fontWeight: 'bold', color: theme.subText }}>Priority:</span>
+            <select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+              style={{ ...inputStyle, width: 'auto' }}
+            >
+              <option value="low">🟢 Low</option>
+              <option value="medium">🟡 Medium</option>
+              <option value="high">🔴 High</option>
+            </select>
+          </div>
+
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={2}
+            placeholder="Notes..."
+            style={{ ...inputStyle, resize: 'vertical' }}
+          />
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Calendars:</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {calendars.map((c) => (
+                <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.8rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedCalIds.includes(c.id)}
+                    onChange={() => toggleCalendarSelection(c.id)}
+                  />
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: c.color }}></span>
+                  {c.name}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+            <button
+              type="submit"
+              style={{ padding: '0.35rem 0.7rem', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer' }}
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowEdit(false)}
+              style={{ padding: '0.35rem 0.7rem', background: '#888', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.85rem', cursor: 'pointer' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </li>
+    )
   }
 
   return (
-    <>
-      <li style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '0.75rem 0', borderBottom: `1px solid ${theme.border}`, gap: '1rem', flexWrap: 'wrap' }}>
-        {isEditing ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flexGrow: 1, marginRight: '1rem' }}>
-            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} style={{ padding: '0.4rem', background: theme.cardBg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '4px' }} />
-            
-            {timeError && (
-              <div style={{ padding: '0.4rem', background: 'rgba(211, 47, 47, 0.1)', color: '#d32f2f', border: '1px solid #d32f2f', borderRadius: '4px', fontSize: '0.85rem' }}>
-                {timeError}
-              </div>
-            )}
+    <li
+      className="event-item-row"
+      style={{
+        background: theme.cardBg,
+        color: theme.text,
+        padding: '0.85rem 1rem',
+        borderRadius: '8px',
+        marginBottom: '0.75rem',
+        border: `1px solid ${theme.border}`,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+        boxSizing: 'border-box',
+        transition: 'all 0.3s ease',
+        gap: '1rem'
+      }}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', flexGrow: 1, minWidth: 0 }}>
+        {/* Single line: Calendar Indicator -> Priority -> Date -> Event Name -> Time */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {/* 1. Calendar Indicator */}
+          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: event.color || '#2196F3', flexShrink: 0 }}></span>
+          
+          {/* 2. Priority */}
+          {priorityEmoji && <span style={{ flexShrink: 0 }}>{priorityEmoji}</span>}
 
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ padding: '0.4rem', background: theme.cardBg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '4px' }} />
-              <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={{ padding: '0.4rem', background: theme.cardBg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '4px' }} title="Start Time" />
-              <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={{ padding: '0.4rem', background: theme.cardBg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '4px' }} title="End Time" />
-            </div>
+          {/* 3. Date */}
+          <span style={{ fontSize: '0.85rem', color: theme.subText, flexShrink: 0, fontWeight: '500' }}>
+            {formatDisplayDate(event.date)}
+          </span>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', flexWrap: 'wrap' }}>
-              <span style={{ fontWeight: 'bold', color: theme.subText }}>Duration presets:</span>
-              <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                {[
-                  { label: 'All Day', mins: 'ALL_DAY' },
-                  { label: '+30m', mins: 30 },
-                  { label: '+1 hr', mins: 60 },
-                  { label: '+2 hrs', mins: 120 },
-                  { label: '+4 hrs', mins: 240 }
-                ].map((p) => {
-                  const isActive = activePreset === p.label
-                  return (
-                    <button
-                      type="button"
-                      key={p.label}
-                      onClick={() => applyPreset(p.mins, p.label)}
-                      style={{
-                        padding: '0.25rem 0.5rem',
-                        border: `1px solid ${isActive ? theme.primary : theme.border}`,
-                        borderRadius: '4px',
-                        background: isActive ? theme.primary : theme.bg,
-                        color: isActive ? '#fff' : theme.text,
-                        cursor: 'pointer',
-                        fontSize: '0.8rem',
-                        fontWeight: isActive ? 'bold' : 'normal',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      {p.label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
+          {/* 4. Event Name */}
+          <span style={{ fontWeight: 'bold', fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {event.title}
+          </span>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
-              <span style={{ fontWeight: 'bold', color: theme.subText }}>Priority:</span>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value)}
-                style={{ padding: '0.4rem', background: theme.cardBg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '4px' }}
-              >
-                <option value="low">🟢 Low</option>
-                <option value="medium">🟡 Medium</option>
-                <option value="high">🔴 High</option>
-              </select>
-            </div>
+          {/* 5. Time / All day badge */}
+          {isAllDay ? (
+            <span
+              style={{
+                background: `${theme.primary}20`,
+                color: theme.primary,
+                border: `1px solid ${theme.primary}40`,
+                padding: '0.05rem 0.35rem',
+                borderRadius: '4px',
+                fontSize: '0.75rem',
+                fontWeight: 'bold',
+                flexShrink: 0
+              }}
+            >
+              All day
+            </span>
+          ) : event.start_time ? (
+            <span style={{ fontSize: '0.85rem', color: theme.subText, flexShrink: 0 }}>
+              {formatDisplayTime(event.start_time)}
+              {event.end_time ? ` - ${formatDisplayTime(event.end_time)}` : ''}
+            </span>
+          ) : null}
 
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes..." rows={2} style={{ padding: '0.4rem', background: theme.cardBg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '4px', resize: 'vertical' }} />
-            <RecurrenceBuilder
-              freq={freq}
-              setFreq={setFreq}
-              interval={interval}
-              setInterval={setInterval}
-              endType={endType}
-              setEndType={setEndType}
-              untilDate={untilDate}
-              setUntilDate={setUntilDate}
-              count={count}
-              setCount={setCount}
-              selectedDays={selectedDays}
-              setSelectedDays={setSelectedDays}
-              monthDay={monthDay}
-              setMonthDay={setMonthDay}
-              theme={theme}
-            />
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flexGrow: 1, minWidth: '200px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <span>
-                <strong>{formatDate(event.date, dateFormat)}{formatTimeDisplay()}:</strong> {event.title}
-              </span>
-              
-              {/* Priority Flag Badge */}
-              {event.priority && event.priority !== 'medium' && (
-                <span
-                  style={{
-                    backgroundColor: event.priority === 'high' ? 'rgba(211, 47, 47, 0.15)' : 'rgba(76, 175, 80, 0.15)',
-                    color: event.priority === 'high' ? '#d32f2f' : '#388e3c',
-                    border: `1px solid ${event.priority === 'high' ? '#d32f2f' : '#388e3c'}`,
-                    padding: '0.1rem 0.4rem',
-                    borderRadius: '4px',
-                    fontSize: '0.75rem',
-                    fontWeight: 'bold',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.2rem'
-                  }}
-                >
-                  {event.priority === 'high' ? '🔴 High' : '🟢 Low'}
-                </span>
-              )}
-
-              {assignedCalendars.map((cal) => (
-                <span
-                  key={cal.id}
-                  style={{
-                    backgroundColor: `${cal.color}20`,
-                    color: cal.color,
-                    border: `1px solid ${cal.color}`,
-                    padding: '0.1rem 0.4rem',
-                    borderRadius: '4px',
-                    fontSize: '0.75rem',
-                    fontWeight: 'bold',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.2rem'
-                  }}
-                >
-                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: cal.color, display: 'inline-block' }}></span>
-                  {cal.name}
-                </span>
-              ))}
-              {event.is_recurring && (
-                <span
-                  style={{
-                    background: 'rgba(33, 150, 243, 0.15)',
-                    color: '#2196F3',
-                    padding: '0.1rem 0.4rem',
-                    borderRadius: '4px',
-                    fontSize: '0.75rem',
-                    fontWeight: 'bold',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.2rem'
-                  }}
-                >
-                  {getRecurrenceText()}
-                </span>
-              )}
-            </div>
-            {event.notes && (
-              <p style={{ margin: 0, fontSize: '0.85rem', color: theme.subText, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                {event.notes}
-              </p>
-            )}
-          </div>
-        )}
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {isEditing ? (
-            <>
-              <button onClick={handleSave} style={{ background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', cursor: 'pointer', fontSize: '0.85rem' }}>Save</button>
-              <button onClick={() => setIsEditing(false)} style={{ background: '#888', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', cursor: 'pointer', fontSize: '0.85rem' }}>Cancel</button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => onGoToCalendar && onGoToCalendar(event.date)}
-                title="View on Calendar"
-                style={{ background: '#607d8b', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', cursor: 'pointer', fontSize: '0.85rem' }}
-              >
-                View on Calendar
-              </button>
-              <button onClick={handleStartEdit} style={{ background: '#2196F3', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', cursor: 'pointer', fontSize: '0.85rem' }}>Edit</button>
-              <button onClick={handleDeleteClick} style={{ background: '#ff4d4d', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', cursor: 'pointer', fontSize: '0.85rem' }}>Delete</button>
-            </>
+          {event.is_recurring && (
+            <span style={{ fontSize: '0.75rem', background: theme.bg, color: theme.subText, padding: '0.1rem 0.4rem', borderRadius: '4px', border: `1px solid ${theme.border}`, flexShrink: 0 }}>
+              Recurring
+            </span>
           )}
         </div>
-      </li>
-      <DeleteModal
-        isOpen={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        onDeleteInstance={() => {
-          setShowDeleteModal(false)
-          onDelete(event.id, 'single', event.date)
+
+        {event.notes && (
+          <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.82rem', color: theme.text, whiteSpace: 'pre-wrap' }}>
+            {event.notes}
+          </p>
+        )}
+      </div>
+
+      <div className="event-item-actions" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
+        <button
+          type="button"
+          onClick={() => onGoToCalendar(event.date)}
+          title="Jump to date on calendar"
+          style={{ padding: '0.35rem 0.6rem', background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer' }}
+        >
+          View
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowEdit(true)}
+          style={{ padding: '0.35rem 0.6rem', background: theme.primary, color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer' }}
+        >
+          Edit
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowDeleteConfirm(true)}
+          style={{ padding: '0.35rem 0.6rem', background: '#d32f2f', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer' }}
+        >
+          Delete
+        </button>
+      </div>
+
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        title={event.is_recurring ? "Delete Recurring Event?" : "Delete Event?"}
+        message={
+          event.is_recurring
+            ? "Would you like to delete just this single instance or the entire series?"
+            : "Are you sure you want to delete this event?"
+        }
+        confirmText={event.is_recurring ? "Delete Series" : "Yes, Delete"}
+        confirmColor="#d32f2f"
+        theme={theme}
+        showInstanceOption={event.is_recurring}
+        onConfirm={(type) => {
+          setShowDeleteConfirm(false)
+          onDelete(event.id, type, event.date)
         }}
-        onDeleteSeries={() => {
-          setShowDeleteModal(false)
-          onDelete(event.id, 'all')
-        }}
+        onClose={() => setShowDeleteConfirm(false)}
       />
-    </>
+    </li>
   )
 }

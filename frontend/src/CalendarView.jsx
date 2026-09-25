@@ -36,15 +36,14 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
       calendarColor = evt.calendar.color
     }
 
-    // Add priority prefix symbol for calendar view blocks
-    const priorityPrefix = evt.priority === 'high' ? '🔴 ' : evt.priority === 'low' ? '🟢 ' : ''
+    const isAllDay = !evt.start_time && !evt.end_time
 
     return {
       id: String(evt.id),
-      title: `${priorityPrefix}${evt.title}`,
+      title: evt.title,
       start: startDateTime,
       end: endDateTime,
-      allDay: !evt.start_time && !evt.end_time,
+      allDay: isAllDay,
       backgroundColor: calendarColor,
       borderColor: calendarColor,
       textColor: '#ffffff',
@@ -179,6 +178,62 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
         dateClick={handleDateClick}
         eventClick={handleEventClick}
         height="auto"
+        slotLabelFormat={{
+          hour: 'numeric',
+          minute: '2-digit',
+          omitZeroMinute: false,
+          meridiem: 'short'
+        }}
+        eventTimeFormat={{
+          hour: 'numeric',
+          minute: '2-digit',
+          meridiem: 'short'
+        }}
+        eventContent={(arg) => {
+          const rawEvent = arg.event.extendedProps.rawEvent
+          const priority = rawEvent ? rawEvent.priority : 'medium'
+          const isAllDay = arg.event.allDay
+
+          const priorityEmoji = priority === 'high' ? '🔴 ' : priority === 'low' ? '🟢 ' : ''
+
+          return (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '3px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%',
+                fontSize: '0.8rem',
+                padding: '1px 2px',
+                boxSizing: 'border-box'
+              }}
+            >
+              {priorityEmoji && <span style={{ flexShrink: 0 }}>{priorityEmoji}</span>}
+              {isAllDay && (
+                <span
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.25)',
+                    color: '#ffffff',
+                    padding: '0.5px 4px',
+                    borderRadius: '3px',
+                    fontSize: '0.68rem',
+                    fontWeight: 'bold',
+                    flexShrink: 0,
+                    letterSpacing: '-0.2px'
+                  }}
+                >
+                  All day
+                </span>
+              )}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: '500' }}>
+                {arg.event.title}
+              </span>
+            </div>
+          )
+        }}
       />
     </div>
   )
