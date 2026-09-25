@@ -92,7 +92,7 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
     setIsSubmitting(true)
     const rrule = buildRruleString()
     try {
-      const response = await apiFetch('/events', {
+      const response = await apiFetch('/events/', {
         method: 'POST',
         body: JSON.stringify({
           title,
