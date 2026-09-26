@@ -4,7 +4,7 @@ import RecurrenceBuilder from './RecurrenceBuilder.jsx'
 import { useEventTime } from './hooks/useEventTime.js'
 import { buildRruleString } from './utils/recurrence.js'
 
-export default function EventForm({ calendars, theme, onEventAdded, defaultDate }) {
+export default function EventForm({ calendars, theme, onEventAdded, defaultDate, onCancel }) {
   const [title, setTitle] = useState('')
   const [date, setDate] = useState('')
   const [notes, setNotes] = useState('')
@@ -60,7 +60,7 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!title || !date || selectedCalIds.length === 0) return
-         
+    
     if (!validateTimes()) return
     setIsSubmitting(true)
 
@@ -102,6 +102,7 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
         setUntilDate('')
         setCount(10)
         setSelectedDays([])
+        if (onCancel) onCancel()
       }
     } catch (error) {
       console.error('Error submitting event:', error)
@@ -129,11 +130,32 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
         gap: '0.75rem',
         background: theme.cardBg,
         padding: '1rem',
-        borderRadius: '6px',
+        borderRadius: '8px',
         border: `1px solid ${theme.border}`,
+        boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
         transition: 'all 0.3s ease'
       }}
     >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+        <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Create New Event</h3>
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: theme.subText,
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '1rem'
+            }}
+          >
+            &times;
+          </button>
+        )}
+      </div>
+
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <input
           type="text"
@@ -206,9 +228,9 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
             onChange={(e) => setPriority(e.target.value)}
             style={{ ...inputStyle, width: 'auto', padding: '0.3rem' }}
           >
-            <option value="low">🟢 Low</option>
-            <option value="medium">🟡 Medium</option>
-            <option value="high">🔴 High</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
           </select>
         </div>
 
@@ -304,23 +326,41 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate 
         </div>
       </div>
 
-      <button
-        type="submit"
-        disabled={isSubmitting || selectedCalIds.length === 0}
-        style={{
-          padding: '0.6rem 1rem',
-          background: '#4CAF50',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer',
-          alignSelf: 'stretch',
-          fontWeight: 'bold',
-          marginTop: '0.5rem'
-        }}
-      >
-        {isSubmitting ? 'Adding...' : 'Add Event'}
-      </button>
+      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+        <button
+          type="submit"
+          disabled={isSubmitting || selectedCalIds.length === 0}
+          style={{
+            flex: 1,
+            padding: '0.6rem 1rem',
+            background: '#4CAF50',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          {isSubmitting ? 'Adding...' : 'Add Event'}
+        </button>
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            style={{
+              padding: '0.6rem 1rem',
+              background: '#888',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 'bold'
+            }}
+          >
+            Cancel
+          </button>
+        )}
+      </div>
     </form>
   )
 }

@@ -18,6 +18,7 @@ export default function App() {
   const [selectedDate, setSelectedDate] = useState('')
   const [modalEvent, setModalEvent] = useState(null)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [showEventForm, setShowEventForm] = useState(false)
   const [themeKey, setThemeKey] = useState('auto')
   const [dateFormat, setDateFormat] = useState('YYYY-MM-DD')
   const [searchQuery, setSearchQuery] = useState('')
@@ -53,12 +54,12 @@ export default function App() {
     if (currentUser) {
       const storageKey = `theme_${currentUser.id}`
       let userSavedTheme = localStorage.getItem(storageKey)
-             
+      
       if (!userSavedTheme) {
         userSavedTheme = 'auto'
         localStorage.setItem(storageKey, 'auto')
       }
-             
+      
       setThemeKey(userSavedTheme)
       const userSavedFormat = localStorage.getItem(`dateFormat_${currentUser.id}`) || 'YYYY-MM-DD'
       setDateFormat(userSavedFormat)
@@ -220,7 +221,7 @@ export default function App() {
     if (filterEndDate && evt.date > filterEndDate) {
       return false
     }
-         
+    
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       const matchesTitle = evt.title && evt.title.toLowerCase().includes(query)
@@ -295,7 +296,7 @@ export default function App() {
           boxSizing: 'border-box'
         }}
       >
-        <div className="header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <div className="header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <img
               src="/penguin-logo.svg"
@@ -326,71 +327,36 @@ export default function App() {
           </div>
         </div>
 
-        {/* Calendar visibility filter chips */}
-        <div
-          style={{
-            background: resolvedTheme.cardBg,
-            color: resolvedTheme.text,
-            padding: '1rem',
-            borderRadius: '8px',
-            marginBottom: '1.5rem',
-            border: `1px solid ${resolvedTheme.border}`,
-            boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-            transition: 'all 0.3s ease',
-            boxSizing: 'border-box'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <div>
-              <h3 style={{ margin: '0 0 0.2rem 0', fontSize: '1.1rem' }}>Calendars</h3>
-              <p style={{ margin: 0, fontSize: '0.8rem', color: resolvedTheme.subText }}>
-                Check boxes to toggle calendar visibility. Manage or add calendars in Settings or click Manage Calendars.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowSettingsModal(true)}
-              style={{ padding: '0.35rem 0.7rem', background: resolvedTheme.primary, color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 'bold' }}
-            >
-                Manage Calendars
-            </button>
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
-            {calendars.map((cal) => {
-              const isVisible = activeCalendarIds.includes(cal.id)
-              return (
-                <label
-                  key={cal.id}
-                  title="Click to toggle calendar visibility"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
-                    background: isVisible ? `${cal.color}15` : resolvedTheme.bg,
-                    padding: '0.3rem 0.6rem',
-                    borderRadius: '6px',
-                    border: `1px solid ${isVisible ? cal.color : resolvedTheme.border}`,
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isVisible}
-                    onChange={() => handleToggleCalendar(cal.id)}
-                    style={{ cursor: 'pointer' }}
-                  />
-                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: cal.color }}></span>
-                  <span style={{ fontWeight: isVisible ? 'bold' : 'normal' }}>{cal.name}</span>
-                </label>
-              )
-            })}
-          </div>
+        {/* Create Event Toggle Bar */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+          <button
+            type="button"
+            onClick={() => setShowEventForm(!showEventForm)}
+            style={{
+              padding: '0.5rem 1rem',
+              background: '#4CAF50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              fontSize: '0.95rem',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}
+          >
+            {showEventForm ? 'Close Form' : '+ Create New Event'}
+          </button>
         </div>
 
-        <h2>Create New Event</h2>
-        <EventForm calendars={calendars} theme={resolvedTheme} onEventAdded={fetchEvents} defaultDate={selectedDate} />
+        {showEventForm && (
+          <EventForm
+            calendars={calendars}
+            theme={resolvedTheme}
+            onEventAdded={fetchEvents}
+            defaultDate={selectedDate}
+            onCancel={() => setShowEventForm(false)}
+          />
+        )}
 
         <CalendarView
           calendarRef={calendarRef}
@@ -398,7 +364,10 @@ export default function App() {
           themeColors={resolvedTheme}
           dateFormat={dateFormat}
           highlightedDate={selectedDate}
-          onDateSelect={(dateStr) => setSelectedDate(dateStr)}
+          onDateSelect={(dateStr) => {
+            setSelectedDate(dateStr)
+            setShowEventForm(true) // Automatically open the form when clicking a calendar day if desired
+          }}
           onEventClick={(evt) => setModalEvent(evt)}
         />
 
@@ -528,6 +497,7 @@ export default function App() {
           themeColors={resolvedTheme}
           dateFormat={dateFormat}
           calendars={calendars}
+          activeCalendarIds={activeCalendarIds}
           onThemeChange={handleThemeChange}
           onDateFormatChange={handleDateFormatChange}
           onUserUpdated={fetchUser}
@@ -536,6 +506,7 @@ export default function App() {
             fetchCalendars()
             fetchEvents()
           }}
+          onToggleCalendar={handleToggleCalendar}
         />
       </div>
 
