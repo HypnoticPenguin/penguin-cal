@@ -5,8 +5,6 @@ import ConfirmModal from './ConfirmModal.jsx'
 export default function EventItem({ event, calendars, theme, dateFormat, onGoToCalendar, onDelete, onUpdate }) {
   const [showEdit, setShowEdit] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [deleteType, setDeleteType] = useState('all') // 'all' or 'single'
-
   const [title, setTitle] = useState(event.title)
   const [date, setDate] = useState(event.date)
   const [startTime, setStartTime] = useState(event.start_time || '')
@@ -14,15 +12,16 @@ export default function EventItem({ event, calendars, theme, dateFormat, onGoToC
   const [notes, setNotes] = useState(event.notes || '')
   const [priority, setPriority] = useState(event.priority || 'medium')
   const [selectedCalIds, setSelectedCalIds] = useState(event.calendar_ids || [])
-
   const isAllDay = !event.start_time && !event.end_time
-  const priorityEmoji = event.priority === 'high' ? '🔴 ' : event.priority === 'low' ? '🟢 ' : ''
+
+  // Skip medium, show explicit clean label badge for high/low priority
+  const priorityLabel = event.priority === 'high' ? 'High' : event.priority === 'low' ? 'Low' : ''
+  const priorityBg = event.priority === 'high' ? '#d32f2f' : event.priority === 'low' ? '#388e3c' : ''
 
   const formatDisplayDate = (dateStr) => {
     if (!dateStr) return ''
     const [y, m, d] = dateStr.split('-')
     if (!y || !m || !d) return dateStr
-
     if (dateFormat === 'DD-MM-YYYY') {
       return `${d}-${m}-${y}`
     } else if (dateFormat === 'DD-Mon-YYYY') {
@@ -30,7 +29,7 @@ export default function EventItem({ event, calendars, theme, dateFormat, onGoToC
       const monthName = months[parseInt(m, 10) - 1] || m
       return `${d}-${monthName}-${y}`
     }
-    return dateStr // Default YYYY-MM-DD
+    return dateStr
   }
 
   const formatDisplayTime = (timeStr) => {
@@ -127,7 +126,6 @@ export default function EventItem({ event, calendars, theme, dateFormat, onGoToC
               style={{ ...inputStyle, flex: 1 }}
             />
           </div>
-
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
             <span style={{ fontWeight: 'bold', color: theme.subText }}>Priority:</span>
             <select
@@ -135,12 +133,11 @@ export default function EventItem({ event, calendars, theme, dateFormat, onGoToC
               onChange={(e) => setPriority(e.target.value)}
               style={{ ...inputStyle, width: 'auto' }}
             >
-              <option value="low">🟢 Low</option>
-              <option value="medium">🟡 Medium</option>
-              <option value="high">🔴 High</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
             </select>
           </div>
-
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -148,7 +145,6 @@ export default function EventItem({ event, calendars, theme, dateFormat, onGoToC
             placeholder="Notes..."
             style={{ ...inputStyle, resize: 'vertical' }}
           />
-
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             <span style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Calendars:</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -165,7 +161,6 @@ export default function EventItem({ event, calendars, theme, dateFormat, onGoToC
               ))}
             </div>
           </div>
-
           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
             <button
               type="submit"
@@ -206,25 +201,48 @@ export default function EventItem({ event, calendars, theme, dateFormat, onGoToC
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', flexGrow: 1, minWidth: 0 }}>
-        {/* Single line: Calendar Indicator -> Priority -> Date -> Event Name -> Time */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          {/* 1. Calendar Indicator */}
-          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: event.color || '#2196F3', flexShrink: 0 }}></span>
-          
-          {/* 2. Priority */}
-          {priorityEmoji && <span style={{ flexShrink: 0 }}>{priorityEmoji}</span>}
+          {/* Render color dots for all calendars this event belongs to */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
+            {event.calendar_ids && event.calendar_ids.length > 0 ? (
+              event.calendar_ids.map((calId) => {
+                const cal = calendars.find((c) => c.id === calId)
+                const dotColor = cal ? cal.color : (event.color || '#2196F3')
+                return (
+                  <span
+                    key={calId}
+                    title={cal ? cal.name : ''}
+                    style={{ width: '10px', height: '10px', borderRadius: '50%', background: dotColor, display: 'inline-block', flexShrink: 0 }}
+                  ></span>
+                )
+              })
+            ) : (
+              <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: event.color || '#2196F3', display: 'inline-block', flexShrink: 0 }}></span>
+            )}
+          </div>
 
-          {/* 3. Date */}
+          {priorityLabel && (
+            <span
+              style={{
+                background: priorityBg,
+                color: '#ffffff',
+                padding: '0.1rem 0.4rem',
+                borderRadius: '4px',
+                fontSize: '0.7rem',
+                fontWeight: 'bold',
+                flexShrink: 0
+              }}
+            >
+              {priorityLabel}
+            </span>
+          )}
+
           <span style={{ fontSize: '0.85rem', color: theme.subText, flexShrink: 0, fontWeight: '500' }}>
             {formatDisplayDate(event.date)}
           </span>
-
-          {/* 4. Event Name */}
           <span style={{ fontWeight: 'bold', fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {event.title}
           </span>
-
-          {/* 5. Time / All day badge */}
           {isAllDay ? (
             <span
               style={{
@@ -246,21 +264,18 @@ export default function EventItem({ event, calendars, theme, dateFormat, onGoToC
               {event.end_time ? ` - ${formatDisplayTime(event.end_time)}` : ''}
             </span>
           ) : null}
-
           {event.is_recurring && (
             <span style={{ fontSize: '0.75rem', background: theme.bg, color: theme.subText, padding: '0.1rem 0.4rem', borderRadius: '4px', border: `1px solid ${theme.border}`, flexShrink: 0 }}>
               Recurring
             </span>
           )}
         </div>
-
         {event.notes && (
           <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.82rem', color: theme.text, whiteSpace: 'pre-wrap' }}>
             {event.notes}
           </p>
         )}
       </div>
-
       <div className="event-item-actions" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
         <button
           type="button"
@@ -285,7 +300,6 @@ export default function EventItem({ event, calendars, theme, dateFormat, onGoToC
           Delete
         </button>
       </div>
-
       <ConfirmModal
         isOpen={showDeleteConfirm}
         title={event.is_recurring ? "Delete Recurring Event?" : "Delete Event?"}

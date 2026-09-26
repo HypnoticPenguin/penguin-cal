@@ -11,7 +11,6 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
   const [priority, setPriority] = useState('medium')
   const [selectedCalIds, setSelectedCalIds] = useState([])
   const [showDateChangeConfirm, setShowDateChangeConfirm] = useState(false)
-  
   const {
     startTime,
     setStartTime,
@@ -182,7 +181,6 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
             </span>
           )}
         </div>
-
         {showDateChangeConfirm ? (
           <div style={{ background: activeTheme.bg, padding: '1.25rem', borderRadius: '6px', border: `1px solid ${activeTheme.border}`, textAlign: 'center', marginBottom: '1rem' }}>
             <h4 style={{ margin: '0 0 0.75rem 0', color: '#ff9800' }}>Shift Recurring Series Start Date?</h4>
@@ -230,13 +228,11 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
                 style={inputStyle}
               />
             </div>
-
             {timeError && (
               <div style={{ padding: '0.5rem', background: 'rgba(211, 47, 47, 0.1)', color: '#d32f2f', border: '1px solid #d32f2f', borderRadius: '4px', fontSize: '0.85rem' }}>
                 {timeError}
               </div>
             )}
-
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: '130px' }}>
                 <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Start Time</label>
@@ -257,7 +253,6 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
                 />
               </div>
             </div>
-
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', flexWrap: 'wrap' }}>
               <span style={{ fontWeight: 'bold', color: activeTheme.subText || '#666' }}>Duration presets:</span>
               <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
@@ -292,7 +287,6 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
                 })}
               </div>
             </div>
-
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
               <span style={{ fontWeight: 'bold', color: activeTheme.subText || '#666' }}>Priority:</span>
               <select
@@ -300,12 +294,11 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
                 onChange={(e) => setPriority(e.target.value)}
                 style={{ ...inputStyle, width: 'auto', padding: '0.3rem' }}
               >
-                <option value="low">🟢 Low</option>
-                <option value="medium">🟡 Medium</option>
-                <option value="high">🔴 High</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
               </select>
             </div>
-
             <div>
               <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Notes</label>
               <textarea
@@ -387,7 +380,7 @@ export default function EventModal({ isOpen, event, calendars = [], theme, onClo
                 <>
                   <button
                     type="button"
-                    onClick={() => onDelete(event.id, 'single', event.date)}
+                    onClick={() => onDelete(event.id, 'single', event.instanceDate || event.date)}
                     style={{
                       padding: '0.6rem',
                       background: '#ff9800',

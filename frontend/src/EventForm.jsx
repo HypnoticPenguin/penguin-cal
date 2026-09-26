@@ -60,10 +60,9 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate,
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!title || !date || selectedCalIds.length === 0) return
-    
+         
     if (!validateTimes()) return
     setIsSubmitting(true)
-
     const rrule = buildRruleString({
       freq,
       interval,
@@ -73,7 +72,6 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate,
       selectedDays,
       monthDay
     })
-
     try {
       const response = await apiFetch('/events/', {
         method: 'POST',
@@ -155,7 +153,6 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate,
           </button>
         )}
       </div>
-
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <input
           type="text"
@@ -191,13 +188,11 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate,
             Today
           </button>
         </div>
-
         {timeError && (
           <div style={{ width: '100%', padding: '0.5rem', background: 'rgba(211, 47, 47, 0.1)', color: '#d32f2f', border: '1px solid #d32f2f', borderRadius: '4px', fontSize: '0.85rem' }}>
             {timeError}
           </div>
         )}
-
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', width: '100%', flexWrap: 'wrap' }}>
           <input
             type="time"
@@ -220,7 +215,6 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate,
             </span>
           )}
         </div>
-
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', fontSize: '0.85rem' }}>
           <span style={{ fontWeight: 'bold', color: theme.subText }}>Priority:</span>
           <select
@@ -233,7 +227,6 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate,
             <option value="high">High</option>
           </select>
         </div>
-
         <textarea
           placeholder="Notes (optional)"
           value={notes}
@@ -242,7 +235,6 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate,
           style={{ ...inputStyle, width: '100%', resize: 'vertical' }}
         />
       </div>
-
       <RecurrenceBuilder
         freq={freq}
         setFreq={setFreq}
@@ -260,7 +252,6 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate,
         setMonthDay={setMonthDay}
         theme={theme}
       />
-
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', flexWrap: 'wrap' }}>
         <span style={{ fontWeight: 'bold', color: theme.subText }}>Duration presets:</span>
         <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
@@ -295,7 +286,6 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate,
           })}
         </div>
       </div>
-
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
         <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Add to Calendars:</span>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -325,7 +315,6 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate,
           ))}
         </div>
       </div>
-
       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
         <button
           type="submit"

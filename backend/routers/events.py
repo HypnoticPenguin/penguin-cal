@@ -19,32 +19,36 @@ def get_events(
     owned = session.exec(select(Calendar).where(Calendar.owner_id == current_user.id)).all()
     shares = session.exec(select(CalendarShare).where(CalendarShare.shared_with_user_id == current_user.id)).all()
     allowed_ids = [c.id for c in owned] + [s.calendar_id for s in shares]
-    
+
     if not allowed_ids:
         return []
-        
+
     cal_map = {c.id: c for c in session.exec(select(Calendar).where(Calendar.id.in_(allowed_ids))).all()}
     links = session.exec(select(EventCalendarLink).where(EventCalendarLink.calendar_id.in_(allowed_ids))).all()
-    
+
     if not links:
         return []
-        
+
     event_cal_map = {}
     for link in links:
         if link.event_id not in event_cal_map:
             event_cal_map[link.event_id] = []
         event_cal_map[link.event_id].append(link.calendar_id)
-        
+
     event_ids = list(event_cal_map.keys())
     user_events = session.exec(select(Event).where(Event.id.in_(event_ids))).all()
-    
+
     output = []
     for event in user_events:
         cal_ids = event_cal_map.get(event.id, [])
-        primary_cal = cal_map.get(cal_ids[0]) if cal_ids else None
+        
+        # Prioritize non-default calendars first so shared/custom calendar colors override personal default color
+        sorted_cal_ids = sorted(cal_ids, key=lambda cid: 0 if (cal_map.get(cid) and not cal_map.get(cid).is_default) else 1)
+        
+        primary_cal = cal_map.get(sorted_cal_ids[0]) if sorted_cal_ids else None
         color = primary_cal.color if primary_cal else "#2196F3"
         exdates_list = [x.strip() for x in event.exdates.split(",")] if event.exdates else []
-        
+
         output.append({
             "id": event.id,
             "title": event.title,
@@ -55,11 +59,11 @@ def get_events(
             "priority": event.priority or "medium",
             "rrule": event.rrule,
             "exdates": exdates_list,
-            "calendar_ids": cal_ids,
+            "calendar_ids": sorted_cal_ids,
             "color": color,
             "is_recurring": bool(event.rrule)
         })
-        
+
     return output
 
 @router.post("/")
@@ -70,7 +74,7 @@ def create_event(
 ):
     if not event_data.calendar_ids:
         raise HTTPException(status_code=400, detail="At least one calendar must be selected")
-        
+
     db_event = Event(
         title=event_data.title,
         date=event_data.date,
@@ -84,12 +88,12 @@ def create_event(
     session.add(db_event)
     session.commit()
     session.refresh(db_event)
-    
+
     for cal_id in event_data.calendar_ids:
         link = EventCalendarLink(event_id=db_event.id, calendar_id=cal_id)
         session.add(link)
     session.commit()
-    
+
     return db_event
 
 @router.put("/{event_id}")
@@ -102,7 +106,7 @@ def update_event(
     event = session.get(Event, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-        
+
     event.title = updated_event.title
     event.date = updated_event.date
     event.start_time = updated_event.start_time if updated_event.start_time else None
@@ -111,7 +115,7 @@ def update_event(
     event.priority = updated_event.priority if updated_event.priority else "medium"
     event.rrule = updated_event.rrule if updated_event.rrule else None
     session.add(event)
-    
+
     if updated_event.calendar_ids is not None:
         existing_links = session.exec(
             select(EventCalendarLink).where(EventCalendarLink.event_id == event_id)
@@ -121,7 +125,7 @@ def update_event(
         for cal_id in updated_event.calendar_ids:
             new_link = EventCalendarLink(event_id=event_id, calendar_id=cal_id)
             session.add(new_link)
-            
+
     session.commit()
     session.refresh(event)
     return event
@@ -137,7 +141,7 @@ def delete_event(
     event = session.get(Event, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-        
+
     if delete_type == "single" and instance_date:
         formatted_date = instance_date[:10]
         exdates_list = [x.strip() for x in event.exdates.split(",")] if event.exdates else []
@@ -146,6 +150,7 @@ def delete_event(
             event.exdates = ",".join(exdates_list)
             session.add(event)
             session.commit()
+            session.refresh(event)
         return {"message": f"Instance on {formatted_date} deleted"}
     else:
         links = session.exec(select(EventCalendarLink).where(EventCalendarLink.event_id == event_id)).all()
@@ -164,7 +169,7 @@ def export_calendar_ics(
     cal = session.get(Calendar, calendar_id)
     if not cal:
         raise HTTPException(status_code=404, detail="Calendar not found")
-        
+
     is_owner = (cal.owner_id == current_user.id)
     if not is_owner:
         share = session.exec(
@@ -175,32 +180,28 @@ def export_calendar_ics(
         ).first()
         if not share:
             raise HTTPException(status_code=403, detail="Access denied to this calendar")
-
     links = session.exec(select(EventCalendarLink).where(EventCalendarLink.calendar_id == calendar_id)).all()
     event_ids = [l.event_id for l in links]
-    
+
     events = []
     if event_ids:
         events = session.exec(select(Event).where(Event.id.in_(event_ids))).all()
-
     ical_cal = ICalCalendar()
     ical_cal.add('prodid', '-//Penguin Cal//Calendar Export//EN')
     ical_cal.add('version', '2.0')
     ical_cal.add('calscale', 'GREGORIAN')
     ical_cal.add('x-wr-calname', cal.name)
-
     for event in events:
         ical_event = ICalEvent()
         ical_event.add('summary', event.title)
-        
+
         date_parts = [int(p) for p in event.date.split('-')]
         event_date = datetime(date_parts[0], date_parts[1], date_parts[2])
-
         if event.start_time:
             start_h, start_m = map(int, event.start_time.split(':'))
             start_dt = event_date.replace(hour=start_h, minute=start_m)
             ical_event.add('dtstart', start_dt)
-            
+
             if event.end_time:
                 end_h, end_m = map(int, event.end_time.split(':'))
                 end_dt = event_date.replace(hour=end_h, minute=end_m)
@@ -210,18 +211,14 @@ def export_calendar_ics(
         else:
             ical_event.add('dtstart', event_date.date())
             ical_event.add('dtend', event_date.date())
-
         if event.notes:
             ical_event.add('description', event.notes)
-            
+
         if event.rrule:
             ical_event.add('rrule', event.rrule)
-
         ical_cal.add_component(ical_event)
-
     ics_data = ical_cal.to_ical()
     filename = f"{cal.name.lower().replace(' ', '_')}_export.ics"
-
     return Response(
         content=ics_data,
         media_type="text/calendar",
@@ -250,10 +247,10 @@ def import_ics_events(
             start = component.get('dtstart')
             end = component.get('dtend')
             description = str(component.get('description', ''))
-            
+
             if not start:
                 continue
-                
+
             start_dt = start.dt
             if hasattr(start_dt, 'strftime'):
                 date_str = start_dt.strftime("%Y-%m-%d")
@@ -261,13 +258,13 @@ def import_ics_events(
             else:
                 date_str = str(start_dt)
                 time_str = None
-                
+
             end_time_str = None
             if end:
                 end_dt = end.dt
                 if hasattr(end_dt, 'strftime') and hasattr(end_dt, 'hour'):
                     end_time_str = end_dt.strftime("%H:%M")
-                    
+
             db_event = Event(
                 title=title,
                 date=date_str,
@@ -293,16 +290,16 @@ def cleanup_past_events(
 ):
     owned_calendars = session.exec(select(Calendar).where(Calendar.owner_id == current_user.id)).all()
     owned_cal_ids = [c.id for c in owned_calendars]
-    
+
     if not owned_cal_ids:
         return {"deleted_count": 0, "message": "No owned calendars found."}
-        
+
     links = session.exec(select(EventCalendarLink).where(EventCalendarLink.calendar_id.in_(owned_cal_ids))).all()
     event_ids = list(set([l.event_id for l in links]))
-    
+
     if not event_ids:
         return {"deleted_count": 0, "message": "No events found to clean up."}
-        
+
     today_str = datetime.now().strftime("%Y-%m-%d")
     user_events = session.exec(select(Event).where(Event.id.in_(event_ids))).all()
     deleted_count = 0

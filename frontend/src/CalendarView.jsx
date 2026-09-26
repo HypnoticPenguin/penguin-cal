@@ -3,6 +3,7 @@ import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
+import rrulePlugin from '@fullcalendar/rrule'
 
 export default function CalendarView({ events, themeColors, dateFormat, onDateSelect, onEventClick, calendarRef, highlightedDate }) {
   const internalCalendarRef = useRef(null)
@@ -25,25 +26,27 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
 
   const handleEventClick = (info) => {
     const rawEvent = info.event.extendedProps.rawEvent
-    if (onEventClick) onEventClick(rawEvent)
+    // Capture the exact instance date clicked from FullCalendar
+    const instanceDate = info.event.startStr ? info.event.startStr.slice(0, 10) : rawEvent.date
+    if (onEventClick) {
+      onEventClick({ ...rawEvent, instanceDate })
+    }
   }
 
   const fcEvents = events.map((evt) => {
     const startDateTime = evt.start_time ? `${evt.date}T${evt.start_time}` : evt.date
     const endDateTime = evt.end_time ? `${evt.date}T${evt.end_time}` : undefined
-    let calendarColor = '#2196F3'
-    if (evt.calendar && evt.calendar.color) {
-      calendarColor = evt.calendar.color
-    }
-
+         
+    // Use the backend-computed color (which handles first-calendar precedence)
+    const calendarColor = evt.color || '#2196F3'
     const isAllDay = !evt.start_time && !evt.end_time
 
-    return {
+    // Base event object mapping
+    const mappedEvent = {
       id: String(evt.id),
       title: evt.title,
-      start: startDateTime,
-      end: endDateTime,
       allDay: isAllDay,
+      display: isAllDay ? 'auto' : 'block',
       backgroundColor: calendarColor,
       borderColor: calendarColor,
       textColor: '#ffffff',
@@ -51,6 +54,24 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
         rawEvent: evt
       }
     }
+
+    // Handle recurring vs one-off event properties explicitly, including exception dates for deleted instances
+    if (evt.rrule) {
+      const cleanDtStart = `${startDateTime.replace(/[-:]/g, '')}${startDateTime.length === 10 ? 'T000000' : ''}`
+      let rruleStr = `DTSTART:${cleanDtStart}\nRRULE:${evt.rrule}`
+
+      if (evt.exdates && evt.exdates.length > 0) {
+        evt.exdates.forEach((d) => {
+          const cleanDate = d.replace(/-/g, '')
+          rruleStr += `\nEXDATE:${cleanDate}T000000Z`
+        })
+      }
+      mappedEvent.rrule = rruleStr
+    } else {
+      mappedEvent.start = startDateTime
+      mappedEvent.end = endDateTime
+    }
+    return mappedEvent
   })
 
   if (highlightedDate) {
@@ -145,10 +166,14 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
           opacity: 0.5;
           color: ${themeColors.subText} !important;
         }
+        .fc-daygrid-event {
+          border-radius: 4px;
+          padding: 1px 2px;
+        }
       `}</style>
       <FullCalendar
         ref={activeRef}
-        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, rrulePlugin]}
         initialView="dayGridMonth"
         headerToolbar={{
           left: 'prev,next today',
@@ -189,12 +214,22 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
           minute: '2-digit',
           meridiem: 'short'
         }}
+        eventDidMount={(info) => {
+          if (info.event.backgroundColor) {
+            info.el.style.backgroundColor = info.event.backgroundColor
+            info.el.style.borderColor = info.event.borderColor
+            info.el.style.color = '#ffffff'
+          }
+        }}
         eventContent={(arg) => {
           const rawEvent = arg.event.extendedProps.rawEvent
           const priority = rawEvent ? rawEvent.priority : 'medium'
           const isAllDay = arg.event.allDay
-
-          const priorityEmoji = priority === 'high' ? '🔴 ' : priority === 'low' ? '🟢 ' : ''
+          const timeStr = rawEvent && rawEvent.start_time ? rawEvent.start_time.slice(0, 5) : ''
+                     
+          // Skip medium, show explicit label for high/low priority
+          const priorityLabel = priority === 'high' ? 'High' : priority === 'low' ? 'Low' : ''
+          const priorityBg = priority === 'high' ? '#d32f2f' : priority === 'low' ? '#388e3c' : ''
 
           return (
             <div
@@ -208,10 +243,30 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
                 width: '100%',
                 fontSize: '0.8rem',
                 padding: '1px 2px',
-                boxSizing: 'border-box'
+                boxSizing: 'border-box',
+                color: '#ffffff'
               }}
             >
-              {priorityEmoji && <span style={{ flexShrink: 0 }}>{priorityEmoji}</span>}
+              {priorityLabel && (
+                <span
+                  style={{
+                    background: priorityBg,
+                    color: '#ffffff',
+                    padding: '0.5px 3px',
+                    borderRadius: '3px',
+                    fontSize: '0.65rem',
+                    fontWeight: 'bold',
+                    flexShrink: 0
+                  }}
+                >
+                  {priorityLabel}
+                </span>
+              )}
+              {timeStr && !isAllDay && (
+                <span style={{ fontSize: '0.75rem', opacity: 0.9, flexShrink: 0, fontWeight: 'bold' }}>
+                  {timeStr}
+                </span>
+              )}
               {isAllDay && (
                 <span
                   style={{

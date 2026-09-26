@@ -361,6 +361,7 @@ export default function App() {
         <CalendarView
           calendarRef={calendarRef}
           events={visibleEvents}
+          calendars={calendars}          
           themeColors={resolvedTheme}
           dateFormat={dateFormat}
           highlightedDate={selectedDate}
