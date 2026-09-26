@@ -39,22 +39,6 @@ penguin-cal/
 
 ---
 
-## ⚙️ Environment Configuration
-
-Create a `.env` file in the root directory based on the following template:
-
-```env
-DOMAIN=yourdomain.com
-SERVICE=cal
-SERVICE_NAME=Penguin Cal
-GROUP=Applications
-DESCRIPTION=Lightweight multi-calendar suite
-JWT_SECRET=super-secret-key-change-this-for-production
-
-```
-
----
-
 ## 🐳 Running with Docker
 
 ### 1. Local Development
@@ -82,6 +66,20 @@ docker compose -f docker-compose.yaml up -d
 ### 3. Production Deployment (Using Pre-built Docker Hub Images)
 
 To run the production setup configured with Traefik and Homepage label integration:
+
+Create a `.env` file in the root directory based on the following template:
+
+```env
+DOMAIN=yourdomain.com
+SERVICE=cal
+SERVICE_NAME=Penguin Cal
+GROUP=Applications
+DESCRIPTION=Lightweight multi-calendar suite
+JWT_SECRET=super-secret-key-change-this-for-production
+
+```
+Spin up the container:
+
 
 ```bash
 docker compose -f docker-compose.prod.yaml pull
