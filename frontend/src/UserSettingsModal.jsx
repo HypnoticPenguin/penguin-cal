@@ -17,11 +17,13 @@ export default function UserSettingsModal({
   themeColors,
   dateFormat,
   calendars = [],
+  activeCalendarIds = [],
   onThemeChange,
   onDateFormatChange,
   onUserUpdated,
   onEventsChanged,
-  onCalendarsChanged
+  onCalendarsChanged,
+  onToggleCalendar
 }) {
   const [displayName, setDisplayName] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
@@ -198,7 +200,6 @@ export default function UserSettingsModal({
         a.click()
         a.remove()
         window.URL.revokeObjectURL(url)
-
         setCalMsg({ text: `Successfully exported ${eventCount} events.`, isError: false })
       } else {
         setCalMsg({ text: 'Failed to export calendar.', isError: true })
@@ -391,10 +392,10 @@ export default function UserSettingsModal({
           </button>
         </form>
 
-        {/* Calendar Management Section */}
+        {/* Calendar Management & Visibility Section */}
         <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <h3 style={{ margin: 0 }}>Calendar Management</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <h3 style={{ margin: 0 }}>Calendar Management & Visibility</h3>
             <button
               type="button"
               onClick={handleOpenCreateCal}
@@ -403,6 +404,9 @@ export default function UserSettingsModal({
               {showCreateCal ? 'Cancel' : '+ New Calendar'}
             </button>
           </div>
+          <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.8rem', color: themeColors.subText }}>
+            Create new calendars, or check/uncheck existing ones to show and hide them on your main calendar view. You can also manage sharing and exports below.
+          </p>
 
           {calMsg.text && (
             <p style={{ color: calMsg.isError ? '#ff5252' : '#66bb6a', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
@@ -439,83 +443,93 @@ export default function UserSettingsModal({
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {calendars.map((cal) => (
-              <div
-                key={cal.id}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  background: themeColors.bg,
-                  padding: '0.75rem',
-                  borderRadius: '6px',
-                  border: `1px solid ${themeColors.border}`
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: cal.color }}></span>
-                    <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{cal.name}</span>
-                    {cal.is_default && (
-                      <span style={{ fontSize: '0.75rem', background: themeColors.cardBg, color: themeColors.subText, padding: '0.1rem 0.4rem', borderRadius: '4px', border: `1px solid ${themeColors.border}` }}>
-                        Personal
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    <button
-                      type="button"
-                      onClick={() => handleExportCalendar(cal)}
-                      style={{ background: '#607d8b', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', minWidth: '60px', textAlign: 'center' }}
-                    >
-                      Export
-                    </button>
-                    {!cal.is_default && cal.is_owner && (
+            {calendars.map((cal) => {
+              const isVisible = activeCalendarIds.includes(cal.id)
+              return (
+                <div
+                  key={cal.id}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    background: themeColors.bg,
+                    padding: '0.75rem',
+                    borderRadius: '6px',
+                    border: `1px solid ${themeColors.border}`
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        type="checkbox"
+                        checked={isVisible}
+                        onChange={() => onToggleCalendar(cal.id)}
+                        title="Toggle calendar visibility"
+                        style={{ cursor: 'pointer' }}
+                      />
+                      <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: cal.color }}></span>
+                      <span style={{ fontWeight: isVisible ? 'bold' : 'normal', fontSize: '0.9rem' }}>{cal.name}</span>
+                      {cal.is_default && (
+                        <span style={{ fontSize: '0.75rem', background: themeColors.cardBg, color: themeColors.subText, padding: '0.1rem 0.4rem', borderRadius: '4px', border: `1px solid ${themeColors.border}` }}>
+                          Personal
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                       <button
                         type="button"
-                        onClick={() => fetchShares(cal.id)}
-                        style={{ background: themeColors.primary, color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', minWidth: '75px', textAlign: 'center' }}
+                        onClick={() => handleExportCalendar(cal)}
+                        style={{ background: '#607d8b', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', minWidth: '60px', textAlign: 'center' }}
                       >
-                        {selectedShareCalId === cal.id ? 'Close' : 'Share'}
+                        Export
                       </button>
-                    )}
-                    {!cal.is_default && cal.is_owner && (
-                      <button
-                        type="button"
-                        onClick={() => setDeleteCalTarget(cal)}
-                        style={{ background: '#d32f2f', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', minWidth: '60px', textAlign: 'center' }}
-                      >
-                        Delete
-                      </button>
-                    )}
+                      {!cal.is_default && cal.is_owner && (
+                        <button
+                          type="button"
+                          onClick={() => fetchShares(cal.id)}
+                          style={{ background: themeColors.primary, color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', minWidth: '75px', textAlign: 'center' }}
+                        >
+                          {selectedShareCalId === cal.id ? 'Close' : 'Share'}
+                        </button>
+                      )}
+                      {!cal.is_default && cal.is_owner && (
+                        <button
+                          type="button"
+                          onClick={() => setDeleteCalTarget(cal)}
+                          style={{ background: '#d32f2f', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', minWidth: '60px', textAlign: 'center' }}
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                {/* Sharing expansion list */}
-                {selectedShareCalId === cal.id && (
-                  <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: `1px dashed ${themeColors.border}` }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '0.4rem' }}>
-                      Share Calendar with Users:
-                    </span>
-                    {shareUsers.length === 0 ? (
-                      <p style={{ fontSize: '0.75rem', color: themeColors.subText, margin: 0 }}>No other users available to share with.</p>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                        {shareUsers.map((u) => (
-                          <label key={u.user_id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={u.has_access}
-                              onChange={() => handleToggleShare(u.user_id, u.has_access)}
-                            />
-                            {u.display_name} <span style={{ color: themeColors.subText }}>(@{u.username})</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+                  {/* Sharing expansion list */}
+                  {selectedShareCalId === cal.id && (
+                    <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: `1px dashed ${themeColors.border}` }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '0.4rem' }}>
+                        Share Calendar with Users:
+                      </span>
+                      {shareUsers.length === 0 ? (
+                        <p style={{ fontSize: '0.75rem', color: themeColors.subText, margin: 0 }}>No other users available to share with.</p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                          {shareUsers.map((u) => (
+                            <label key={u.user_id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={u.has_access}
+                                onChange={() => handleToggleShare(u.user_id, u.has_access)}
+                              />
+                              {u.display_name} <span style={{ color: themeColors.subText }}>(@{u.username})</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
 
@@ -559,7 +573,7 @@ export default function UserSettingsModal({
         {/* Data Management & Imports */}
         <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
           <h3 style={{ margin: '0 0 0.75rem 0' }}>Data Management & Imports</h3>
-                     
+          
           <div style={{ marginBottom: '1.25rem' }}>
             <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem' }}>Import Calendar (.ics)</h4>
             {importMessage && <p style={{ fontSize: '0.85rem', color: themeColors.primary, marginBottom: '0.5rem' }}>{importMessage}</p>}
@@ -655,6 +669,7 @@ export default function UserSettingsModal({
               style={inputStyle}
             />
           </div>
+
           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'space-between', flexWrap: 'wrap' }}>
             <button
               type="submit"
@@ -683,6 +698,7 @@ export default function UserSettingsModal({
         onConfirm={handleCleanupPastEvents}
         onClose={() => setShowCleanupConfirm(false)}
       />
+
       <ConfirmModal
         isOpen={Boolean(deleteCalTarget)}
         title="Delete Calendar?"

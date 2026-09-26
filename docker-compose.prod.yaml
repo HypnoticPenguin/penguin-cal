@@ -33,7 +33,7 @@ services:
       - "traefik.http.routers.${SERVICE}.middlewares=secured@file"
       - homepage.group=${GROUP}
       - homepage.name=${SERVICE_NAME}
-      - homepage.icon=cal.png
+      - homepage.icon=calendar.png
       - homepage.href=https://${SERVICE}.${DOMAIN}/
       - homepage.description=${DESCRIPTION}
       # Watchtower
