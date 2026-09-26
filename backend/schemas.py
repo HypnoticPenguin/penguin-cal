@@ -11,9 +11,13 @@ class UserResponse(BaseModel):
     username: str
     display_name: Optional[str] = None
     is_admin: bool
+    theme: str
+    date_format: str
 
 class ProfileUpdate(BaseModel):
-    display_name: str
+    display_name: Optional[str] = None
+    theme: Optional[str] = None
+    date_format: Optional[str] = None
 
 class CalendarCreate(BaseModel):
     name: str

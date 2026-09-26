@@ -7,6 +7,8 @@ class User(SQLModel, table=True):
     display_name: Optional[str] = Field(default=None)
     hashed_password: str
     is_admin: bool = Field(default=False)
+    theme: str = Field(default="auto")
+    date_format: str = Field(default="YYYY-MM-DD")
 
 class Calendar(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

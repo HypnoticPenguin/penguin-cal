@@ -44,7 +44,7 @@ penguin-cal/
 Create a `.env` file in the root directory based on the following template:
 
 ```env
-DOMAIN=yourdomain.co.uk
+DOMAIN=yourdomain.com
 SERVICE=cal
 SERVICE_NAME=Penguin Cal
 GROUP=Applications
@@ -71,7 +71,7 @@ docker compose -f docker-compose.dev.yaml up --build
 
 ### 2. Production Deployment 
 
-To run a simple setup:
+To run a simple setup (no Traefik or Homepage integration):
 
 ```bash
 docker compose -f docker-compose.yaml pull
@@ -81,7 +81,7 @@ docker compose -f docker-compose.yaml up -d
 
 ### 3. Production Deployment (Using Pre-built Docker Hub Images)
 
-To run the production setup configured with Traefik reverse-proxy and automatic HTTPS via Cloudflare:
+To run the production setup configured with Traefik and Homepage label integration:
 
 ```bash
 docker compose -f docker-compose.prod.yaml pull

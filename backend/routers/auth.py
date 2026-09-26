@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
-
 from database import get_session
 from models import User, Calendar
 from schemas import UserRegister, UserResponse, ProfileUpdate, TokenResponse
@@ -26,7 +25,9 @@ def register_user(user_data: UserRegister, session: Session = Depends(get_sessio
         username=user_data.username,
         display_name=d_name,
         hashed_password=hash_password(user_data.password),
-        is_admin=is_first_user
+        is_admin=is_first_user,
+        theme="auto",
+        date_format="YYYY-MM-DD"
     )
     session.add(new_user)
     session.commit()
@@ -60,7 +61,9 @@ def get_me(current_user: User = Depends(get_current_user)):
         "id": current_user.id,
         "username": current_user.username,
         "display_name": current_user.display_name or current_user.username,
-        "is_admin": current_user.is_admin
+        "is_admin": current_user.is_admin,
+        "theme": current_user.theme or "auto",
+        "date_format": current_user.date_format or "YYYY-MM-DD"
     }
 
 @router.put("/profile", response_model=UserResponse)
@@ -69,11 +72,18 @@ def update_profile(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
-    clean_name = profile_data.display_name.strip()
-    if not clean_name:
-        raise HTTPException(status_code=400, detail="Display name cannot be empty")
+    if profile_data.display_name is not None:
+        clean_name = profile_data.display_name.strip()
+        if not clean_name:
+            raise HTTPException(status_code=400, detail="Display name cannot be empty")
+        current_user.display_name = clean_name
         
-    current_user.display_name = clean_name
+    if profile_data.theme is not None:
+        current_user.theme = profile_data.theme
+        
+    if profile_data.date_format is not None:
+        current_user.date_format = profile_data.date_format
+        
     session.add(current_user)
     session.commit()
     session.refresh(current_user)
@@ -82,7 +92,9 @@ def update_profile(
         "id": current_user.id,
         "username": current_user.username,
         "display_name": current_user.display_name,
-        "is_admin": current_user.is_admin
+        "is_admin": current_user.is_admin,
+        "theme": current_user.theme,
+        "date_format": current_user.date_format
     }
 
 @router.put("/change-password")

@@ -19,8 +19,6 @@ export default function App() {
   const [modalEvent, setModalEvent] = useState(null)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [showEventForm, setShowEventForm] = useState(false)
-  const [themeKey, setThemeKey] = useState('auto')
-  const [dateFormat, setDateFormat] = useState('YYYY-MM-DD')
   const [searchQuery, setSearchQuery] = useState('')
   const calendarRef = useRef(null)
 
@@ -37,6 +35,9 @@ export default function App() {
     return () => mediaQuery.removeEventListener('change', handleChange)
   }, [])
 
+  const themeKey = currentUser?.theme || 'auto'
+  const dateFormat = currentUser?.date_format || 'YYYY-MM-DD'
+
   const resolvedTheme = themeKey === 'auto'
     ? (systemPrefDark ? themes.dark : themes.light)
     : (themes[themeKey] || themes.light)
@@ -50,36 +51,33 @@ export default function App() {
   const [filterStartDate, setFilterStartDate] = useState(todayStr)
   const [filterEndDate, setFilterEndDate] = useState(futureStr)
 
-  useEffect(() => {
-    if (currentUser) {
-      const storageKey = `theme_${currentUser.id}`
-      let userSavedTheme = localStorage.getItem(storageKey)
-      
-      if (!userSavedTheme) {
-        userSavedTheme = 'auto'
-        localStorage.setItem(storageKey, 'auto')
+  const handleThemeChange = async (newTheme) => {
+    try {
+      const res = await apiFetch('/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ theme: newTheme })
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setCurrentUser(updated)
       }
-      
-      setThemeKey(userSavedTheme)
-      const userSavedFormat = localStorage.getItem(`dateFormat_${currentUser.id}`) || 'YYYY-MM-DD'
-      setDateFormat(userSavedFormat)
-    } else {
-      setThemeKey('auto')
-      setDateFormat('YYYY-MM-DD')
-    }
-  }, [currentUser])
-
-  const handleThemeChange = (newTheme) => {
-    setThemeKey(newTheme)
-    if (currentUser) {
-      localStorage.setItem(`theme_${currentUser.id}`, newTheme)
+    } catch (err) {
+      console.error('Failed to update theme preference', err)
     }
   }
 
-  const handleDateFormatChange = (newFormat) => {
-    setDateFormat(newFormat)
-    if (currentUser) {
-      localStorage.setItem(`dateFormat_${currentUser.id}`, newFormat)
+  const handleDateFormatChange = async (newFormat) => {
+    try {
+      const res = await apiFetch('/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ date_format: newFormat })
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setCurrentUser(updated)
+      }
+    } catch (err) {
+      console.error('Failed to update date format preference', err)
     }
   }
 
@@ -167,8 +165,6 @@ export default function App() {
     setEvents([])
     setCalendars([])
     setActiveCalendarIds([])
-    setThemeKey('auto')
-    setDateFormat('YYYY-MM-DD')
   }
 
   if (!token) {
@@ -361,13 +357,13 @@ export default function App() {
         <CalendarView
           calendarRef={calendarRef}
           events={visibleEvents}
-          calendars={calendars}          
+          calendars={calendars}
           themeColors={resolvedTheme}
           dateFormat={dateFormat}
           highlightedDate={selectedDate}
           onDateSelect={(dateStr) => {
             setSelectedDate(dateStr)
-            setShowEventForm(true) // Automatically open the form when clicking a calendar day if desired
+            setShowEventForm(true)
           }}
           onEventClick={(evt) => setModalEvent(evt)}
         />

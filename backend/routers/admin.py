@@ -19,7 +19,9 @@ def list_users(
             "id": u.id,
             "username": u.username,
             "display_name": u.display_name or u.username,
-            "is_admin": u.is_admin
+            "is_admin": u.is_admin,
+            "theme": u.theme or "auto",
+            "date_format": u.date_format or "YYYY-MM-DD"
         }
         for u in users
     ]
@@ -65,7 +67,7 @@ def admin_reset_password(
     target_user = session.get(User, user_id)
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+        
     if not payload.new_password or len(payload.new_password) < 4:
         raise HTTPException(status_code=400, detail="Password must be at least 4 characters long")
         
