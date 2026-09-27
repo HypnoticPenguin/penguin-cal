@@ -37,7 +37,6 @@ export default function App() {
 
   const themeKey = currentUser?.theme || 'auto'
   const dateFormat = currentUser?.date_format || 'YYYY-MM-DD'
-
   const resolvedTheme = themeKey === 'auto'
     ? (systemPrefDark ? themes.dark : themes.light)
     : (themes[themeKey] || themes.light)
@@ -94,7 +93,7 @@ export default function App() {
       if (res.ok) {
         const data = await res.json()
         setCalendars(data)
-        
+
         // Restore persisted calendar visibility if available, otherwise default to all active
         if (currentUser) {
           const savedCals = localStorage.getItem(`active_cals_${currentUser.id}`)
@@ -199,7 +198,14 @@ export default function App() {
             transition: 'all 0.3s ease'
           }}
         >
-          Penguin Cal v{pkg.version} &copy; {new Date().getFullYear()}
+          <a
+            href="https://github.com/HypnoticPenguin/penguin-cal"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: resolvedTheme.primary, textDecoration: 'none' }}
+          >
+            Penguin Cal v{pkg.version}
+          </a> &copy; {new Date().getFullYear()}
         </footer>
       </div>
     )
@@ -217,7 +223,7 @@ export default function App() {
     if (filterEndDate && evt.date > filterEndDate) {
       return false
     }
-    
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       const matchesTitle = evt.title && evt.title.toLowerCase().includes(query)
@@ -519,7 +525,14 @@ export default function App() {
           transition: 'all 0.3s ease'
         }}
       >
-        Penguin Cal v{pkg.version} &copy; {new Date().getFullYear()}
+        <a
+          href="https://github.com/HypnoticPenguin/penguin-cal"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: resolvedTheme.primary, textDecoration: 'none' }}
+        >
+          Penguin Cal v{pkg.version}
+        </a> &copy; {new Date().getFullYear()}
       </footer>
     </div>
   )
