@@ -195,14 +195,15 @@ export default function App() {
             color: resolvedTheme.subText,
             fontSize: '0.85rem',
             background: resolvedTheme.cardBg,
-            transition: 'all 0.3s ease'
+            transition: 'all 0.3s ease',
+            fontFamily: 'sans-serif'
           }}
         >
           <a
             href="https://github.com/HypnoticPenguin/penguin-cal"
             target="_blank"
             rel="noopener noreferrer"
-            style={{ color: resolvedTheme.primary, textDecoration: 'none' }}
+            style={{ color: resolvedTheme.primary, textDecoration: 'none', fontFamily: 'sans-serif' }}
           >
             Penguin Cal v{pkg.version}
           </a> &copy; {new Date().getFullYear()}
@@ -522,14 +523,15 @@ export default function App() {
           color: resolvedTheme.subText,
           fontSize: '0.85rem',
           background: resolvedTheme.cardBg,
-          transition: 'all 0.3s ease'
+          transition: 'all 0.3s ease',
+          fontFamily: 'sans-serif'
         }}
       >
         <a
           href="https://github.com/HypnoticPenguin/penguin-cal"
           target="_blank"
           rel="noopener noreferrer"
-          style={{ color: resolvedTheme.primary, textDecoration: 'none' }}
+          style={{ color: resolvedTheme.primary, textDecoration: 'none', fontFamily: 'sans-serif' }}
         >
           Penguin Cal v{pkg.version}
         </a> &copy; {new Date().getFullYear()}
