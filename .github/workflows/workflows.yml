@@ -46,7 +46,10 @@ jobs:
         run: |
           TAG="${{ env.NEW_TAG }}"
           
-          # If the tag already exists, automatically bump it until unique
+          # 1. Fetch latest changes and tags from remote first to prevent out-of-sync conflicts
+          git fetch origin main
+          
+          # 2. If the tag already exists, automatically bump it until unique
           while git rev-parse "$TAG" >/dev/null 2>&1 || git ls-remote --tags origin | grep -qw "$TAG"; do
             echo "Tag $TAG already exists. Incrementing version..."
             cd frontend
@@ -62,10 +65,10 @@ jobs:
           git add frontend/package.json
           git commit -m "chore(release): bump version to $TAG [skip ci]" || echo "No changes to commit"
           
-          # Pull any remote changes using rebase to prevent non-fast-forward rejections
+          # 3. Pull with rebase incorporating any remote updates safely
           git pull --rebase origin main
           
-          # Clean up any local duplicate tags, set the fresh tag, and push
+          # 4. Clean up any local duplicate tags, set the fresh tag, and push
           git tag -d "$TAG" 2>/dev/null || true
           git tag "$TAG"
           git push origin main --tags
