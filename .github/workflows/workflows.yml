@@ -46,7 +46,7 @@ jobs:
         run: |
           TAG="${{ env.NEW_TAG }}"
           
-          # 1. Fetch latest changes and tags from remote first to prevent out-of-sync conflicts
+          # 1. Fetch latest changes and tags from origin (GitHub) to prevent out-of-sync conflicts
           git fetch origin main
           
           # 2. If the tag already exists, automatically bump it until unique
@@ -62,13 +62,15 @@ jobs:
           FINAL_VERSION=$(echo "$TAG" | sed 's/^v//')
           echo "NEW_VERSION=$FINAL_VERSION" >> $GITHUB_OUTPUT
           
+          # 3. Stage and commit package.json explicitly from root context
           git add frontend/package.json
+          git status
           git commit -m "chore(release): bump version to $TAG [skip ci]" || echo "No changes to commit"
           
-          # 3. Pull with rebase incorporating any remote updates safely
+          # 4. Pull with rebase incorporating any remote updates safely
           git pull --rebase origin main
           
-          # 4. Clean up any local duplicate tags, set the fresh tag, and push
+          # 5. Clean up any local duplicate tags, set the fresh tag, and push to GitHub
           git tag -d "$TAG" 2>/dev/null || true
           git tag "$TAG"
           git push origin main --tags
