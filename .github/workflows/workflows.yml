@@ -32,43 +32,43 @@ jobs:
         id: version-bump
         working-directory: ./frontend
         run: |
-          # Increment patch version (e.g., 0.1.0 -> 0.1.1) using npm
+          # Increment patch version (e.g., 0.1.0 -> 0.1.1) using npm[cite: 2]
           npm version patch --no-git-tag-version
-
+          
           # Extract the new version into an environment variable
           NEW_VERSION=$(node -p "require('./package.json').version")
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "Bumped version to v$NEW_VERSION"
 
       - name: Commit version change and tag
-              env:
-                NEW_TAG: v${{ steps.version-bump.outputs.NEW_VERSION }}
-              run: |
-                TAG="${{ env.NEW_TAG }}"
-                
-                # If the tag already exists, automatically bump it until unique
-                while git rev-parse "$TAG" >/dev/null 2>&1 || git ls-remote --tags origin | grep -qw "$TAG"; do
-                  echo "Tag $TAG already exists. Incrementing version..."
-                  cd frontend
-                  npm version patch --no-git-tag-version
-                  NEW_VERSION=$(node -p "require('./package.json').version")
-                  cd ..
-                  TAG="v$NEW_VERSION"
-                done
-                
-                FINAL_VERSION=$(echo "$TAG" | sed 's/^v//')
-                echo "NEW_VERSION=$FINAL_VERSION" >> $GITHUB_OUTPUT
-                
-                git add frontend/package.json
-                git commit -m "chore(release): bump version to $TAG [skip ci]" || echo "No changes to commit"
-                
-                # Pull any remote changes using rebase to prevent non-fast-forward rejections
-                git pull --rebase origin main
-                
-                # Clean up any local duplicate tags, set the fresh tag, and push
-                git tag -d "$TAG" 2>/dev/null || true
-                git tag "$TAG"
-                git push origin main --tags
+        env:
+          NEW_TAG: v${{ steps.version-bump.outputs.NEW_VERSION }}
+        run: |
+          TAG="${{ env.NEW_TAG }}"
+          
+          # If the tag already exists, automatically bump it until unique
+          while git rev-parse "$TAG" >/dev/null 2>&1 || git ls-remote --tags origin | grep -qw "$TAG"; do
+            echo "Tag $TAG already exists. Incrementing version..."
+            cd frontend
+            npm version patch --no-git-tag-version
+            NEW_VERSION=$(node -p "require('./package.json').version")
+            cd ..
+            TAG="v$NEW_VERSION"
+          done
+          
+          FINAL_VERSION=$(echo "$TAG" | sed 's/^v//')
+          echo "NEW_VERSION=$FINAL_VERSION" >> $GITHUB_OUTPUT
+          
+          git add frontend/package.json
+          git commit -m "chore(release): bump version to $TAG [skip ci]" || echo "No changes to commit"
+          
+          # Pull any remote changes using rebase to prevent non-fast-forward rejections
+          git pull --rebase origin main
+          
+          # Clean up any local duplicate tags, set the fresh tag, and push
+          git tag -d "$TAG" 2>/dev/null || true
+          git tag "$TAG"
+          git push origin main --tags
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
