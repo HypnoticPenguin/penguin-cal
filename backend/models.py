@@ -9,6 +9,7 @@ class User(SQLModel, table=True):
     is_admin: bool = Field(default=False)
     theme: str = Field(default="auto")
     date_format: str = Field(default="YYYY-MM-DD")
+    day_start_time: str = Field(default="06:00:00")
 
 class Calendar(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
