@@ -7,7 +7,8 @@ import EventForm from './EventForm.jsx'
 import EventItem from './EventItem.jsx'
 import CalendarView from './CalendarView.jsx'
 import EventModal from './EventModal.jsx'
-import UserSettingsModal from './UserSettingsModal.jsx'
+import AccountSettingsModal from './AccountSettingsModal.jsx'
+import DataSettingsModal from './DataSettingsModal.jsx'
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token'))
@@ -17,7 +18,8 @@ export default function App() {
   const [events, setEvents] = useState([])
   const [selectedDate, setSelectedDate] = useState('')
   const [modalEvent, setModalEvent] = useState(null)
-  const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [showAccountModal, setShowAccountModal] = useState(false)
+  const [showDataModal, setShowDataModal] = useState(false)
   const [showEventForm, setShowEventForm] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const calendarRef = useRef(null)
@@ -93,20 +95,24 @@ export default function App() {
       if (res.ok) {
         const data = await res.json()
         setCalendars(data)
-
-        // Restore persisted calendar visibility if available, otherwise default to all active
-        if (currentUser) {
-          const savedCals = localStorage.getItem(`active_cals_${currentUser.id}`)
-          if (savedCals) {
-            try {
-              const parsed = JSON.parse(savedCals)
-              const validIds = parsed.filter(id => data.some(c => c.id === id))
-              setActiveCalendarIds(validIds)
-              return
-            } catch (e) {}
+        
+        setActiveCalendarIds((prev) => {
+          const allIds = data.map((c) => c.id)
+          if (currentUser) {
+            const savedCals = localStorage.getItem(`active_cals_${currentUser.id}`)
+            if (savedCals) {
+              try {
+                const parsed = JSON.parse(savedCals)
+                const validIds = parsed.filter(id => allIds.includes(id))
+                const brandNewIds = allIds.filter(id => !validIds.includes(id))
+                const combined = [...validIds, ...brandNewIds]
+                localStorage.setItem(`active_cals_${currentUser.id}`, JSON.stringify(combined))
+                return combined
+              } catch (e) {}
+            }
           }
-        }
-        setActiveCalendarIds(data.map((c) => c.id))
+          return allIds
+        })
       }
     } catch (err) {
       console.error('Failed to fetch calendars:', err)
@@ -224,7 +230,6 @@ export default function App() {
     if (filterEndDate && evt.date > filterEndDate) {
       return false
     }
-
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       const matchesTitle = evt.title && evt.title.toLowerCase().includes(query)
@@ -316,10 +321,16 @@ export default function App() {
               )}
             </span>
             <button
-              onClick={() => setShowSettingsModal(true)}
+              onClick={() => setShowAccountModal(true)}
               style={{ padding: '0.4rem 0.8rem', background: resolvedTheme.primary, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
             >
-              Settings
+              Account
+            </button>
+            <button
+              onClick={() => setShowDataModal(true)}
+              style={{ padding: '0.4rem 0.8rem', background: '#607d8b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+            >
+              Settings & Calendars
             </button>
             <button
               onClick={handleLogout}
@@ -493,9 +504,17 @@ export default function App() {
           }}
         />
 
-        <UserSettingsModal
-          isOpen={showSettingsModal}
-          onClose={() => setShowSettingsModal(false)}
+        <AccountSettingsModal
+          isOpen={showAccountModal}
+          onClose={() => setShowAccountModal(false)}
+          currentUser={currentUser}
+          themeColors={resolvedTheme}
+          onUserUpdated={fetchUser}
+        />
+
+        <DataSettingsModal
+          isOpen={showDataModal}
+          onClose={() => setShowDataModal(false)}
           currentUser={currentUser}
           currentTheme={themeKey}
           themeColors={resolvedTheme}
@@ -504,7 +523,6 @@ export default function App() {
           activeCalendarIds={activeCalendarIds}
           onThemeChange={handleThemeChange}
           onDateFormatChange={handleDateFormatChange}
-          onUserUpdated={fetchUser}
           onEventsChanged={fetchEvents}
           onCalendarsChanged={() => {
             fetchCalendars()
@@ -512,6 +530,7 @@ export default function App() {
           }}
           onToggleCalendar={handleToggleCalendar}
         />
+
       </div>
 
       <footer
