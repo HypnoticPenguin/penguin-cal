@@ -162,6 +162,30 @@ export default function CalendarView({ events, themeColors, dateFormat, dayStart
           border-radius: 4px;
           padding: 1px 2px;
         }
+
+        /* FullCalendar +x more Popover Theming Fix */
+        .fc-popover {
+          background-color: ${themeColors.cardBg} !important;
+          color: ${themeColors.text} !important;
+          border: 1px solid ${themeColors.border} !important;
+          border-radius: 8px !important;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+        }
+        .fc-popover-header {
+          background-color: ${themeColors.bg} !important;
+          color: ${themeColors.text} !important;
+          border-bottom: 1px solid ${themeColors.border} !important;
+          padding: 6px 10px !important;
+        }
+        .fc-popover-body {
+          background-color: ${themeColors.cardBg} !important;
+          color: ${themeColors.text} !important;
+          padding: 8px !important;
+        }
+        .fc-popover .fc-popover-close {
+          opacity: 0.8 !important;
+          color: ${themeColors.text} !important;
+        }
       `}</style>
       <FullCalendar
         ref={activeRef}
