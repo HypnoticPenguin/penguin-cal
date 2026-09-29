@@ -43,6 +43,11 @@ export default function DataSettingsModal({
   const [calMsg, setCalMsg] = useState({ text: '', isError: false })
   const [deleteCalTarget, setDeleteCalTarget] = useState(null)
 
+  // Calendar Editing State
+  const [editingCalId, setEditingCalId] = useState(null)
+  const [editCalName, setEditCalName] = useState('')
+  const [editCalColor, setEditCalColor] = useState('#2196F3')
+
   // Calendar Sharing States
   const [shareUsers, setShareUsers] = useState([])
   const [selectedShareCalId, setSelectedShareCalId] = useState(null)
@@ -70,6 +75,7 @@ export default function DataSettingsModal({
       setSelectedShareCalId(null)
       setShareUsers([])
       setUndoBatchTarget(null)
+      setEditingCalId(null)
     } else {
       fetchImportBatches()
     }
@@ -134,6 +140,36 @@ export default function DataSettingsModal({
     }
   }
 
+  const handleStartEditCal = (cal) => {
+    setEditingCalId(cal.id)
+    setEditCalName(cal.name)
+    setEditCalColor(cal.color || '#2196F3')
+    setSelectedShareCalId(null)
+  }
+
+  const handleSaveEditCal = async (calId) => {
+    if (!editCalName.trim()) return
+    setCalMsg({ text: '', isError: false })
+    try {
+      const res = await apiFetch(`/calendars/${calId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name: editCalName, color: editCalColor })
+      })
+      if (res.ok) {
+        setEditingCalId(null)
+        setCalMsg({ text: 'Calendar updated successfully!', isError: false })
+        fetchImportBatches()
+        if (onCalendarsChanged) onCalendarsChanged()
+        if (onEventsChanged) onEventsChanged()
+      } else {
+        const data = await res.json()
+        setCalMsg({ text: data.detail || 'Failed to update calendar', isError: true })
+      }
+    } catch (err) {
+      setCalMsg({ text: 'Error updating calendar', isError: true })
+    }
+  }
+
   const handleDeleteCalendar = async () => {
     if (!deleteCalTarget) return
     setCalMsg({ text: '', isError: false })
@@ -144,6 +180,7 @@ export default function DataSettingsModal({
       if (res.ok) {
         setCalMsg({ text: `Calendar '${deleteCalTarget.name}' deleted.`, isError: false })
         setDeleteCalTarget(null)
+        fetchImportBatches()
         if (onCalendarsChanged) onCalendarsChanged()
         if (onEventsChanged) onEventsChanged()
       } else {
@@ -163,6 +200,7 @@ export default function DataSettingsModal({
       setShareUsers([])
       return
     }
+    setEditingCalId(null)
     try {
       const res = await apiFetch(`/calendars/${calId}/shares`)
       if (res.ok) {
@@ -359,7 +397,7 @@ export default function DataSettingsModal({
             </button>
           </div>
           <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.8rem', color: themeColors.subText }}>
-            Create new calendars, or check/uncheck existing ones to show and hide them on your main calendar view. You can also manage sharing and exports below.
+            Create new calendars, or check/uncheck existing ones to show and hide them on your main calendar view. You can also manage sharing, edits, exports, and deletes below.
           </p>
 
           {calMsg.text && (
@@ -399,6 +437,8 @@ export default function DataSettingsModal({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {calendars.map((cal) => {
               const isVisible = activeCalendarIds.includes(cal.id)
+              const isEditing = editingCalId === cal.id
+
               return (
                 <div
                   key={cal.id}
@@ -412,7 +452,7 @@ export default function DataSettingsModal({
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexGrow: 1 }}>
                       <input
                         type="checkbox"
                         checked={isVisible}
@@ -420,41 +460,88 @@ export default function DataSettingsModal({
                         title="Toggle calendar visibility"
                         style={{ cursor: 'pointer' }}
                       />
-                      <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: cal.color }}></span>
-                      <span style={{ fontWeight: isVisible ? 'bold' : 'normal', fontSize: '0.9rem' }}>{cal.name}</span>
-                      {cal.is_default && (
-                        <span style={{ fontSize: '0.75rem', background: themeColors.cardBg, color: themeColors.subText, padding: '0.1rem 0.4rem', borderRadius: '4px', border: `1px solid ${themeColors.border}` }}>
-                          Personal
-                        </span>
+
+                      {isEditing ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexGrow: 1, flexWrap: 'wrap' }}>
+                          <input
+                            type="color"
+                            value={editCalColor}
+                            onChange={(e) => setEditCalColor(e.target.value)}
+                            style={{ border: 'none', width: '28px', height: '28px', cursor: 'pointer', background: 'transparent' }}
+                          />
+                          <input
+                            type="text"
+                            value={editCalName}
+                            onChange={(e) => setEditCalName(e.target.value)}
+                            style={{ ...inputStyle, padding: '0.25rem 0.5rem', fontSize: '0.85rem', flexGrow: 1, minWidth: '120px' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveEditCal(cal.id)}
+                            style={{ background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', padding: '0.25rem 0.5rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingCalId(null)}
+                            style={{ background: '#888', color: 'white', border: 'none', borderRadius: '4px', padding: '0.25rem 0.5rem', fontSize: '0.8rem', cursor: 'pointer' }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: cal.color }}></span>
+                          <span style={{ fontWeight: isVisible ? 'bold' : 'normal', fontSize: '0.9rem' }}>{cal.name}</span>
+                          {cal.is_default && (
+                            <span style={{ fontSize: '0.75rem', background: themeColors.cardBg, color: themeColors.subText, padding: '0.1rem 0.4rem', borderRadius: '4px', border: `1px solid ${themeColors.border}` }}>
+                              Personal
+                            </span>
+                          )}
+                        </>
                       )}
                     </div>
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      <button
-                        type="button"
-                        onClick={() => handleExportCalendar(cal)}
-                        style={{ background: '#607d8b', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', minWidth: '60px', textAlign: 'center' }}
-                      >
-                        Export
-                      </button>
-                      {!cal.is_default && cal.is_owner && (
+
+                    {!isEditing && (
+                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                        {/* Reordered buttons: Share, Edit, Export, Delete */}
+                        {!cal.is_default && cal.is_owner && (
+                          <button
+                            type="button"
+                            onClick={() => fetchShares(cal.id)}
+                            style={{ background: themeColors.primary, color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', textAlign: 'center' }}
+                          >
+                            {selectedShareCalId === cal.id ? 'Close' : 'Share'}
+                          </button>
+                        )}
+                        {cal.is_owner && (
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditCal(cal)}
+                            style={{ background: '#ff9800', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', textAlign: 'center' }}
+                          >
+                            Edit
+                          </button>
+                        )}
                         <button
                           type="button"
-                          onClick={() => fetchShares(cal.id)}
-                          style={{ background: themeColors.primary, color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', minWidth: '75px', textAlign: 'center' }}
+                          onClick={() => handleExportCalendar(cal)}
+                          style={{ background: '#607d8b', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', textAlign: 'center' }}
                         >
-                          {selectedShareCalId === cal.id ? 'Close' : 'Share'}
+                          Export
                         </button>
-                      )}
-                      {!cal.is_default && cal.is_owner && (
-                        <button
-                          type="button"
-                          onClick={() => setDeleteCalTarget(cal)}
-                          style={{ background: '#d32f2f', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', minWidth: '60px', textAlign: 'center' }}
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </div>
+                        {!cal.is_default && cal.is_owner && (
+                          <button
+                            type="button"
+                            onClick={() => setDeleteCalTarget(cal)}
+                            style={{ background: '#d32f2f', color: 'white', border: 'none', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', textAlign: 'center' }}
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {selectedShareCalId === cal.id && (
