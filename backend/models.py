@@ -27,6 +27,15 @@ class EventCalendarLink(SQLModel, table=True):
     event_id: int = Field(foreign_key="event.id", index=True)
     calendar_id: int = Field(foreign_key="calendar.id", index=True)
 
+class ImportBatch(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    batch_id: str = Field(unique=True, index=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    calendar_id: int = Field(foreign_key="calendar.id", index=True)
+    filename: str
+    imported_at: str
+    event_count: int = Field(default=0)
+
 class Event(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     title: str
@@ -37,3 +46,4 @@ class Event(SQLModel, table=True):
     priority: Optional[str] = Field(default="medium")
     rrule: Optional[str] = None
     exdates: Optional[str] = None
+    import_batch_id: Optional[str] = Field(default=None, index=True)

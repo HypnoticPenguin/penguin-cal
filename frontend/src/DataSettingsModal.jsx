@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { apiFetch } from './api.js'
 import { themeList } from './themes.js'
-import AdminPanel from './AdminPanel.jsx'
 import ConfirmModal from './ConfirmModal.jsx'
 
 const COLOR_PALETTE = [
@@ -9,7 +8,7 @@ const COLOR_PALETTE = [
   '#9C27B0', '#00BCD4', '#FFEB3B', '#795548', '#607D8B', '#F44336'
 ]
 
-export default function UserSettingsModal({
+export default function DataSettingsModal({
   isOpen,
   onClose,
   currentUser,
@@ -20,26 +19,24 @@ export default function UserSettingsModal({
   activeCalendarIds = [],
   onThemeChange,
   onDateFormatChange,
-  onUserUpdated,
   onEventsChanged,
   onCalendarsChanged,
   onToggleCalendar
 }) {
-  const [displayName, setDisplayName] = useState('')
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [profileMsg, setProfileMsg] = useState({ text: '', isError: false })
-  const [passMsg, setPassMsg] = useState({ text: '', isError: false })
   const [cleanupMsg, setCleanupMsg] = useState({ text: '', isError: false })
   const [isCleaning, setIsCleaning] = useState(false)
   const [showCleanupConfirm, setShowCleanupConfirm] = useState(false)
+  
   const [importCalId, setImportCalId] = useState('')
   const [importFile, setImportFile] = useState(null)
   const [importLoading, setImportLoading] = useState(false)
   const [importMessage, setImportMessage] = useState('')
+  
+  // Persistent Import Batches History State
+  const [importBatches, setImportBatches] = useState([])
+  const [undoBatchTarget, setUndoBatchTarget] = useState(null)
 
-  // Calendar Management States inside Settings
+  // Calendar Management States
   const [showCreateCal, setShowCreateCal] = useState(false)
   const [newCalName, setNewCalName] = useState('')
   const [newCalColor, setNewCalColor] = useState('#2196F3')
@@ -52,7 +49,7 @@ export default function UserSettingsModal({
 
   useEffect(() => {
     if (currentUser) {
-      setDisplayName(currentUser.display_name || currentUser.username || '')
+      fetchImportBatches()
     }
   }, [currentUser])
 
@@ -64,8 +61,6 @@ export default function UserSettingsModal({
 
   useEffect(() => {
     if (!isOpen) {
-      setProfileMsg({ text: '', isError: false })
-      setPassMsg({ text: '', isError: false })
       setCleanupMsg({ text: '', isError: false })
       setCalMsg({ text: '', isError: false })
       setImportMessage('')
@@ -74,18 +69,25 @@ export default function UserSettingsModal({
       setDeleteCalTarget(null)
       setSelectedShareCalId(null)
       setShareUsers([])
+      setUndoBatchTarget(null)
+    } else {
+      fetchImportBatches()
     }
   }, [isOpen])
 
-  if (!isOpen) return null
-
-  const clearMessagesExcept = (activeSection) => {
-    if (activeSection !== 'profile') setProfileMsg({ text: '', isError: false })
-    if (activeSection !== 'pass') setPassMsg({ text: '', isError: false })
-    if (activeSection !== 'cleanup') setCleanupMsg({ text: '', isError: false })
-    if (activeSection !== 'calendars') setCalMsg({ text: '', isError: false })
-    if (activeSection !== 'import') setImportMessage('')
+  const fetchImportBatches = async () => {
+    try {
+      const res = await apiFetch('/events/import-batches')
+      if (res.ok) {
+        const data = await res.json()
+        setImportBatches(data)
+      }
+    } catch (err) {
+      console.error('Failed to load import history', err)
+    }
   }
+
+  if (!isOpen) return null
 
   const handleOpenCreateCal = () => {
     if (!showCreateCal) {
@@ -101,16 +103,27 @@ export default function UserSettingsModal({
   const handleCreateCalendar = async (e) => {
     e.preventDefault()
     if (!newCalName) return
-    clearMessagesExcept('calendars')
+    setCalMsg({ text: '', isError: false })
     try {
       const res = await apiFetch('/calendars/', {
         method: 'POST',
         body: JSON.stringify({ name: newCalName, color: newCalColor })
       })
       if (res.ok) {
+        const newCalData = await res.json()
         setNewCalName('')
         setShowCreateCal(false)
         setCalMsg({ text: 'Calendar created successfully!', isError: false })
+        
+        if (currentUser && newCalData && newCalData.id) {
+          const savedCals = localStorage.getItem(`active_cals_${currentUser.id}`)
+          let currentActive = savedCals ? JSON.parse(savedCals) : calendars.map(c => c.id)
+          if (!currentActive.includes(newCalData.id)) {
+            currentActive.push(newCalData.id)
+            localStorage.setItem(`active_cals_${currentUser.id}`, JSON.stringify(currentActive))
+          }
+        }
+
         if (onCalendarsChanged) onCalendarsChanged()
       } else {
         const data = await res.json()
@@ -123,7 +136,7 @@ export default function UserSettingsModal({
 
   const handleDeleteCalendar = async () => {
     if (!deleteCalTarget) return
-    clearMessagesExcept('calendars')
+    setCalMsg({ text: '', isError: false })
     try {
       const res = await apiFetch(`/calendars/${deleteCalTarget.id}`, {
         method: 'DELETE'
@@ -182,7 +195,7 @@ export default function UserSettingsModal({
   }
 
   const handleExportCalendar = async (cal) => {
-    clearMessagesExcept('calendars')
+    setCalMsg({ text: '', isError: false })
     try {
       const token = localStorage.getItem('token')
       const res = await fetch(`/api/events/calendars/${cal.id}/export.ics`, {
@@ -210,59 +223,10 @@ export default function UserSettingsModal({
     }
   }
 
-  const handleProfileSubmit = async (e) => {
-    e.preventDefault()
-    setProfileMsg({ text: '', isError: false })
-    try {
-      const res = await apiFetch('/auth/profile', {
-        method: 'PUT',
-        body: JSON.stringify({ display_name: displayName })
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setProfileMsg({ text: 'Display name updated successfully!', isError: false })
-        if (onUserUpdated) onUserUpdated()
-      } else {
-        setProfileMsg({ text: data.detail || 'Failed to update display name', isError: true })
-      }
-    } catch (err) {
-      setProfileMsg({ text: 'Error updating display name', isError: true })
-    }
-  }
-
-  const handlePasswordSubmit = async (e) => {
-    e.preventDefault()
-    setPassMsg({ text: '', isError: false })
-    if (newPassword !== confirmPassword) {
-      setPassMsg({ text: 'New passwords do not match.', isError: true })
-      return
-    }
-    try {
-      const res = await apiFetch('/auth/change-password', {
-        method: 'PUT',
-        body: JSON.stringify({
-          current_password: currentPassword,
-          new_password: newPassword
-        })
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setPassMsg({ text: 'Password updated successfully!', isError: false })
-        setCurrentPassword('')
-        setNewPassword('')
-        setConfirmPassword('')
-      } else {
-        setPassMsg({ text: data.detail || 'Failed to update password', isError: true })
-      }
-    } catch (err) {
-      setPassMsg({ text: 'Error updating password', isError: true })
-    }
-  }
-
   const handleCleanupPastEvents = async () => {
     setShowCleanupConfirm(false)
     setIsCleaning(true)
-    clearMessagesExcept('cleanup')
+    setCleanupMsg({ text: '', isError: false })
     try {
       const res = await apiFetch('/events/cleanup-past', { method: 'POST' })
       let data = {}
@@ -288,7 +252,7 @@ export default function UserSettingsModal({
     e.preventDefault()
     if (!importFile || !importCalId) return
     setImportLoading(true)
-    clearMessagesExcept('import')
+    setImportMessage('')
     const formData = new FormData()
     formData.append('calendar_id', importCalId)
     formData.append('file', importFile)
@@ -303,12 +267,38 @@ export default function UserSettingsModal({
       if (res.ok) {
         setImportMessage(data.message)
         setImportFile(null)
+        fetchImportBatches()
         if (typeof onEventsChanged === 'function') onEventsChanged()
       } else {
         setImportMessage(data.detail || 'Import failed.')
       }
     } catch (err) {
       setImportMessage('Network error during import.')
+    } finally {
+      setImportLoading(false)
+    }
+  }
+
+  const confirmUndoImport = async () => {
+    if (!undoBatchTarget) return
+    const batchId = undoBatchTarget.batch_id
+    setUndoBatchTarget(null)
+    setImportLoading(true)
+    setImportMessage('')
+    try {
+      const res = await apiFetch(`/events/import-ics/undo/${batchId}`, {
+        method: 'POST'
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setImportMessage(data.message)
+        fetchImportBatches()
+        if (typeof onEventsChanged === 'function') onEventsChanged()
+      } else {
+        setImportMessage(data.detail || 'Failed to undo import.')
+      }
+    } catch (err) {
+      setImportMessage('Network error during undo.')
     } finally {
       setImportLoading(false)
     }
@@ -354,43 +344,7 @@ export default function UserSettingsModal({
           boxSizing: 'border-box'
         }}
       >
-        <h2 style={{ marginTop: 0, marginBottom: '1.25rem' }}>Account & App Settings</h2>
-
-        {currentUser?.is_admin && (
-          <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
-            <AdminPanel currentUserId={currentUser.id} theme={themeColors} />
-          </div>
-        )}
-
-        {/* Profile Section */}
-        <form
-          onSubmit={handleProfileSubmit}
-          onChange={() => clearMessagesExcept('profile')}
-          style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}
-        >
-          <h3 style={{ margin: '0 0 0.75rem 0' }}>Profile</h3>
-          {profileMsg.text && (
-            <p style={{ color: profileMsg.isError ? '#ff5252' : '#66bb6a', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
-              {profileMsg.text}
-            </p>
-          )}
-          <div style={{ marginBottom: '0.75rem' }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Display Name</label>
-            <input
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              required
-              style={inputStyle}
-            />
-          </div>
-          <button
-            type="submit"
-            style={{ padding: '0.4rem 0.8rem', background: themeColors.primary, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-          >
-            Save Profile
-          </button>
-        </form>
+        <h2 style={{ marginTop: 0, marginBottom: '1.25rem' }}>Calendar & App Settings</h2>
 
         {/* Calendar Management & Visibility Section */}
         <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
@@ -503,7 +457,6 @@ export default function UserSettingsModal({
                     </div>
                   </div>
 
-                  {/* Sharing expansion list */}
                   {selectedShareCalId === cal.id && (
                     <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: `1px dashed ${themeColors.border}` }}>
                       <span style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '0.4rem' }}>
@@ -540,10 +493,7 @@ export default function UserSettingsModal({
             <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Calendar Theme</label>
             <select
               value={currentTheme}
-              onChange={(e) => {
-                clearMessagesExcept('appearance')
-                onThemeChange(e.target.value)
-              }}
+              onChange={(e) => onThemeChange(e.target.value)}
               style={inputStyle}
             >
               {themeList.map((t) => (
@@ -557,10 +507,7 @@ export default function UserSettingsModal({
             <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Date Format</label>
             <select
               value={dateFormat}
-              onChange={(e) => {
-                clearMessagesExcept('appearance')
-                onDateFormatChange(e.target.value)
-              }}
+              onChange={(e) => onDateFormatChange(e.target.value)}
               style={inputStyle}
             >
               <option value="YYYY-MM-DD">YYYY-MM-DD (e.g. 2026-09-24)</option>
@@ -576,8 +523,22 @@ export default function UserSettingsModal({
           
           <div style={{ marginBottom: '1.25rem' }}>
             <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem' }}>Import Calendar (.ics)</h4>
-            {importMessage && <p style={{ fontSize: '0.85rem', color: themeColors.primary, marginBottom: '0.5rem' }}>{importMessage}</p>}
-            <form onSubmit={handleIcsUpload} onChange={() => clearMessagesExcept('import')} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {importMessage && (
+              <div style={{ background: `${themeColors.primary}15`, border: `1px solid ${themeColors.primary}40`, padding: '0.5rem', borderRadius: '4px', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.85rem', color: themeColors.text }}>{importMessage}</span>
+              </div>
+            )}
+            <form onSubmit={handleIcsUpload} onChange={() => setImportMessage('')} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.80rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Select .ics File</label>
+                <input
+                  type="file"
+                  accept=".ics"
+                  onChange={(e) => setImportFile(e.target.files[0])}
+                  required
+                  style={{ width: '100%', color: themeColors.text, fontSize: '0.85rem' }}
+                />
+              </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.80rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Target Calendar</label>
                 <select
@@ -590,16 +551,6 @@ export default function UserSettingsModal({
                   ))}
                 </select>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.80rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Select .ics File</label>
-                <input
-                  type="file"
-                  accept=".ics"
-                  onChange={(e) => setImportFile(e.target.files[0])}
-                  required
-                  style={{ width: '100%', color: themeColors.text, fontSize: '0.85rem' }}
-                />
-              </div>
               <button
                 type="submit"
                 disabled={importLoading}
@@ -608,9 +559,50 @@ export default function UserSettingsModal({
                 {importLoading ? 'Importing...' : 'Import Events'}
               </button>
             </form>
+
+            <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: `1px dashed ${themeColors.border}` }}>
+              <h5 style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem', color: themeColors.subText }}>Recent Imports & Rollbacks</h5>
+              {importBatches.length === 0 ? (
+                <p style={{ fontSize: '0.75rem', color: themeColors.subText, margin: 0 }}>No past import logs found.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '160px', overflowY: 'auto' }}>
+                  {importBatches.map((batch) => (
+                    <div
+                      key={batch.batch_id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        background: themeColors.bg,
+                        padding: '0.4rem 0.6rem',
+                        borderRadius: '4px',
+                        border: `1px solid ${themeColors.border}`,
+                        fontSize: '0.8rem',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <strong>{batch.filename}</strong> ({batch.event_count} events)<br />
+                        <span style={{ fontSize: '0.7rem', color: themeColors.subText }}>
+                          To: {batch.calendar_name} • {batch.imported_at}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setUndoBatchTarget(batch)}
+                        disabled={importLoading}
+                        style={{ padding: '0.2rem 0.5rem', background: '#d32f2f', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.75rem', flexShrink: 0 }}
+                      >
+                        Rollback
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
-          <div style={{ paddingTop: '0.75rem', borderTop: `1px dashed ${themeColors.border}` }} onClick={() => clearMessagesExcept('cleanup')}>
+          <div style={{ paddingTop: '0.75rem', borderTop: `1px dashed ${themeColors.border}` }}>
             <h4 style={{ margin: '0 0 0.3rem 0', fontSize: '0.95rem' }}>Clear Past Events</h4>
             <p style={{ fontSize: '0.80rem', color: themeColors.subText, marginBottom: '0.75rem' }}>
               Remove old one-off events that occurred before today. Recurring events and future entries are safe.
@@ -631,62 +623,27 @@ export default function UserSettingsModal({
           </div>
         </div>
 
-        {/* Change Password */}
-        <form onSubmit={handlePasswordSubmit} onChange={() => clearMessagesExcept('pass')}>
-          <h3 style={{ margin: '0 0 0.75rem 0' }}>Change Password</h3>
-          {passMsg.text && (
-            <p style={{ color: passMsg.isError ? '#ff5252' : '#66bb6a', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
-              {passMsg.text}
-            </p>
-          )}
-          <div style={{ marginBottom: '0.75rem' }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Current Password</label>
-            <input
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              required
-              style={inputStyle}
-            />
-          </div>
-          <div style={{ marginBottom: '0.75rem' }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>New Password</label>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              required
-              style={inputStyle}
-            />
-          </div>
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Confirm New Password</label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              style={inputStyle}
-            />
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-            <button
-              type="submit"
-              style={{ padding: '0.5rem 1rem', background: themeColors.primary, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-            >
-              Update Password
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{ padding: '0.5rem 1rem', background: '#e0e0e0', color: '#333', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-            >
-              Close
-            </button>
-          </div>
-        </form>
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ padding: '0.5rem 1rem', background: '#e0e0e0', color: '#333', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            Close
+          </button>
+        </div>
       </div>
+
+      <ConfirmModal
+        isOpen={Boolean(undoBatchTarget)}
+        title="Rollback Import Batch?"
+        message={`Are you sure you want to remove all ${undoBatchTarget?.event_count || ''} events imported from '${undoBatchTarget?.filename}'? This cannot be undone.`}
+        confirmText="Yes, Rollback"
+        confirmColor="#d32f2f"
+        theme={themeColors}
+        onConfirm={confirmUndoImport}
+        onClose={() => setUndoBatchTarget(null)}
+      />
 
       <ConfirmModal
         isOpen={showCleanupConfirm}
