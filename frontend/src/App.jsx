@@ -24,7 +24,6 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('')
   const calendarRef = useRef(null)
 
-  // System preference listener for 'auto' theme mode
   const [systemPrefDark, setSystemPrefDark] = useState(
     window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : false
   )
@@ -39,6 +38,8 @@ export default function App() {
 
   const themeKey = currentUser?.theme || 'auto'
   const dateFormat = currentUser?.date_format || 'YYYY-MM-DD'
+  const dayStartTime = currentUser?.day_start_time || '06:00:00'
+
   const resolvedTheme = themeKey === 'auto'
     ? (systemPrefDark ? themes.dark : themes.light)
     : (themes[themeKey] || themes.light)
@@ -79,6 +80,21 @@ export default function App() {
       }
     } catch (err) {
       console.error('Failed to update date format preference', err)
+    }
+  }
+
+  const handleDayStartTimeChange = async (newStartTime) => {
+    try {
+      const res = await apiFetch('/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ day_start_time: newStartTime })
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setCurrentUser(updated)
+      }
+    } catch (err) {
+      console.error('Failed to update day start time preference', err)
     }
   }
 
@@ -378,6 +394,7 @@ export default function App() {
           calendars={calendars}
           themeColors={resolvedTheme}
           dateFormat={dateFormat}
+          dayStartTime={dayStartTime}
           highlightedDate={selectedDate}
           onDateSelect={(dateStr) => {
             setSelectedDate(dateStr)
@@ -519,10 +536,12 @@ export default function App() {
           currentTheme={themeKey}
           themeColors={resolvedTheme}
           dateFormat={dateFormat}
+          dayStartTime={dayStartTime}
           calendars={calendars}
           activeCalendarIds={activeCalendarIds}
           onThemeChange={handleThemeChange}
           onDateFormatChange={handleDateFormatChange}
+          onDayStartTimeChange={handleDayStartTimeChange}
           onEventsChanged={fetchEvents}
           onCalendarsChanged={() => {
             fetchCalendars()

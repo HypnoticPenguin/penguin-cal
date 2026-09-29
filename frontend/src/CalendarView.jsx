@@ -5,11 +5,20 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import rrulePlugin from '@fullcalendar/rrule'
 
-export default function CalendarView({ events, themeColors, dateFormat, onDateSelect, onEventClick, calendarRef, highlightedDate }) {
+export default function CalendarView({ events, themeColors, dateFormat, dayStartTime = '06:00:00', onDateSelect, onEventClick, calendarRef, highlightedDate }) {
   const internalCalendarRef = useRef(null)
   const activeRef = calendarRef || internalCalendarRef
 
-  // Fix the "Today" button title attribute / tooltip text rendered by FullCalendar
+  // Instantly scroll to the new start time whenever dayStartTime changes
+  useEffect(() => {
+    if (activeRef.current) {
+      const calendarApi = activeRef.current.getApi()
+      if (calendarApi.view.type.startsWith('timeGrid')) {
+        calendarApi.scrollToTime(dayStartTime)
+      }
+    }
+  }, [dayStartTime])
+
   useEffect(() => {
     const timer = setTimeout(() => {
       const todayBtn = document.querySelector('.fc-today-button')
@@ -26,7 +35,6 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
 
   const handleEventClick = (info) => {
     const rawEvent = info.event.extendedProps.rawEvent
-    // Capture the exact instance date clicked from FullCalendar
     const instanceDate = info.event.startStr ? info.event.startStr.slice(0, 10) : rawEvent.date
     if (onEventClick) {
       onEventClick({ ...rawEvent, instanceDate })
@@ -36,12 +44,8 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
   const fcEvents = events.map((evt) => {
     const startDateTime = evt.start_time ? `${evt.date}T${evt.start_time}` : evt.date
     const endDateTime = evt.end_time ? `${evt.date}T${evt.end_time}` : undefined
-         
-    // Use the backend-computed color (which handles first-calendar precedence)
     const calendarColor = evt.color || '#2196F3'
     const isAllDay = !evt.start_time && !evt.end_time
-
-    // Base event object mapping
     const mappedEvent = {
       id: String(evt.id),
       title: evt.title,
@@ -54,12 +58,9 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
         rawEvent: evt
       }
     }
-
-    // Handle recurring vs one-off event properties explicitly, including exception dates for deleted instances
     if (evt.rrule) {
       const cleanDtStart = `${startDateTime.replace(/[-:]/g, '')}${startDateTime.length === 10 ? 'T000000' : ''}`
       let rruleStr = `DTSTART:${cleanDtStart}\nRRULE:${evt.rrule}`
-
       if (evt.exdates && evt.exdates.length > 0) {
         evt.exdates.forEach((d) => {
           const cleanDate = d.replace(/-/g, '')
@@ -98,16 +99,13 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
       }}
     >
       <style>{`
-        /* Comprehensive FullCalendar Theme Overrides for Header & Body Readability */
         .fc {
           color: ${themeColors.text} !important;
           background-color: ${themeColors.cardBg} !important;
         }
-        /* Toolbar Header Title (Month/Year) */
         .fc .fc-toolbar-title {
           color: ${themeColors.text} !important;
         }
-        /* Day of week column headers (Mon, Tue, Wed...) and wrapper header row background */
         .fc .fc-col-header,
         .fc .fc-col-header-cell,
         .fc .fc-scrollgrid-section-header td,
@@ -122,21 +120,18 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
           display: block;
           padding: 8px 4px;
         }
-        /* Calendar grid day numbers */
         .fc .fc-daygrid-day-number,
         .fc .fc-timegrid-slot-label-cushion,
         .fc .fc-timegrid-axis-cushion {
           color: ${themeColors.text} !important;
           text-decoration: none !important;
         }
-        /* Background grid styling for days/slots */
         .fc .fc-daygrid-day,
         .fc .fc-timegrid-slot,
         .fc .fc-timegrid-axis {
           background-color: transparent !important;
           border-color: ${themeColors.border} !important;
         }
-        /* Toolbar Navigation & View Buttons */
         .fc .fc-button-primary {
           background-color: ${themeColors.primary} !important;
           border-color: ${themeColors.primary} !important;
@@ -153,15 +148,12 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
         .fc .fc-button-active {
           filter: brightness(0.85);
         }
-        /* All Borders & Scrollgrid Layout Lines */
         .fc th, .fc td, .fc hr, .fc .fc-scrollgrid, .fc-theme-standard td, .fc-theme-standard th {
           border-color: ${themeColors.border} !important;
         }
-        /* Today Highlight cell */
         .fc .fc-day-today {
           background-color: ${themeColors.primary}20 !important;
         }
-        /* Other months muted look */
         .fc .fc-day-other .fc-daygrid-day-number {
           opacity: 0.5;
           color: ${themeColors.subText} !important;
@@ -170,11 +162,36 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
           border-radius: 4px;
           padding: 1px 2px;
         }
+
+        /* FullCalendar +x more Popover Theming Fix */
+        .fc-popover {
+          background-color: ${themeColors.cardBg} !important;
+          color: ${themeColors.text} !important;
+          border: 1px solid ${themeColors.border} !important;
+          border-radius: 8px !important;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+        }
+        .fc-popover-header {
+          background-color: ${themeColors.bg} !important;
+          color: ${themeColors.text} !important;
+          border-bottom: 1px solid ${themeColors.border} !important;
+          padding: 6px 10px !important;
+        }
+        .fc-popover-body {
+          background-color: ${themeColors.cardBg} !important;
+          color: ${themeColors.text} !important;
+          padding: 8px !important;
+        }
+        .fc-popover .fc-popover-close {
+          opacity: 0.8 !important;
+          color: ${themeColors.text} !important;
+        }
       `}</style>
       <FullCalendar
         ref={activeRef}
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, rrulePlugin]}
         initialView="dayGridMonth"
+        scrollTime={dayStartTime}
         headerToolbar={{
           left: 'prev,next today',
           center: 'title',
@@ -202,7 +219,7 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
         dayMaxEvents={true}
         dateClick={handleDateClick}
         eventClick={handleEventClick}
-        height="auto"
+        height="700px"
         slotLabelFormat={{
           hour: 'numeric',
           minute: '2-digit',
@@ -226,11 +243,9 @@ export default function CalendarView({ events, themeColors, dateFormat, onDateSe
           const priority = rawEvent ? rawEvent.priority : 'medium'
           const isAllDay = arg.event.allDay
           const timeStr = rawEvent && rawEvent.start_time ? rawEvent.start_time.slice(0, 5) : ''
-                     
-          // Skip medium, show explicit label for high/low priority
+          
           const priorityLabel = priority === 'high' ? 'High' : priority === 'low' ? 'Low' : ''
           const priorityBg = priority === 'high' ? '#d32f2f' : priority === 'low' ? '#388e3c' : ''
-
           return (
             <div
               style={{

@@ -15,10 +15,12 @@ export default function DataSettingsModal({
   currentTheme,
   themeColors,
   dateFormat,
+  dayStartTime,
   calendars = [],
   activeCalendarIds = [],
   onThemeChange,
   onDateFormatChange,
+  onDayStartTimeChange,
   onEventsChanged,
   onCalendarsChanged,
   onToggleCalendar
@@ -505,7 +507,6 @@ export default function DataSettingsModal({
 
                     {!isEditing && (
                       <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                        {/* Reordered buttons: Share, Edit, Export, Delete */}
                         {!cal.is_default && cal.is_owner && (
                           <button
                             type="button"
@@ -590,7 +591,7 @@ export default function DataSettingsModal({
               ))}
             </select>
           </div>
-          <div>
+          <div style={{ marginBottom: '0.75rem' }}>
             <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Date Format</label>
             <select
               value={dateFormat}
@@ -600,6 +601,20 @@ export default function DataSettingsModal({
               <option value="YYYY-MM-DD">YYYY-MM-DD (e.g. 2026-09-24)</option>
               <option value="DD-MM-YYYY">DD-MM-YYYY (e.g. 24-09-2026)</option>
               <option value="DD-Mon-YYYY">DD-Mon-YYYY (e.g. 24-Sep-2026)</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Day/Week View Start Time</label>
+            <select
+              value={dayStartTime}
+              onChange={(e) => onDayStartTimeChange(e.target.value)}
+              style={inputStyle}
+            >
+              <option value="00:00:00">12:00 AM (Midnight)</option>
+              <option value="06:00:00">6:00 AM</option>
+              <option value="07:00:00">7:00 AM</option>
+              <option value="08:00:00">8:00 AM</option>
+              <option value="09:00:00">9:00 AM</option>
             </select>
           </div>
         </div>
