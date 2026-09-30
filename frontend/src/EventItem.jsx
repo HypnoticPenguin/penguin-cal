@@ -2,11 +2,10 @@ import { useState } from 'react'
 import { apiFetch } from './api.js'
 import ConfirmModal from './ConfirmModal.jsx'
 
-export default function EventItem({ event, calendars, theme, dateFormat, onGoToCalendar, onDelete, onEdit }) {
+export default function EventItem({ event, calendars, theme, dateFormat, timeFormat = '12h', onGoToCalendar, onDelete, onEdit }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const isAllDay = !event.start_time && !event.end_time
 
-  // Skip medium, show explicit clean label badge for high/low priority
   const priorityLabel = event.priority === 'high' ? 'High' : event.priority === 'low' ? 'Low' : ''
   const priorityBg = event.priority === 'high' ? '#d32f2f' : event.priority === 'low' ? '#388e3c' : ''
 
@@ -29,6 +28,11 @@ export default function EventItem({ event, calendars, theme, dateFormat, onGoToC
     const [h, m] = timeStr.split(':')
     const hourNum = parseInt(h, 10)
     if (isNaN(hourNum)) return timeStr
+
+    if (timeFormat === '24h') {
+      return `${String(hourNum).padStart(2, '0')}:${m}`
+    }
+
     const meridiem = hourNum >= 12 ? 'PM' : 'AM'
     const formattedHour = hourNum % 12 === 0 ? 12 : hourNum % 12
     return `${formattedHour}:${m} ${meridiem}`
@@ -57,7 +61,6 @@ export default function EventItem({ event, calendars, theme, dateFormat, onGoToC
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', flexGrow: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          {/* Render color dots for all calendars this event belongs to */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
             {event.calendar_ids && event.calendar_ids.length > 0 ? (
               event.calendar_ids.map((calId) => {

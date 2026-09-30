@@ -23,6 +23,7 @@ export default function App() {
   const [showEventForm, setShowEventForm] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const calendarRef = useRef(null)
+
   const [systemPrefDark, setSystemPrefDark] = useState(
     window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : false
   )
@@ -37,7 +38,9 @@ export default function App() {
 
   const themeKey = currentUser?.theme || 'auto'
   const dateFormat = currentUser?.date_format || 'YYYY-MM-DD'
+  const timeFormat = currentUser?.time_format || '12h'
   const dayStartTime = currentUser?.day_start_time || '06:00:00'
+
   const resolvedTheme = themeKey === 'auto'
     ? (systemPrefDark ? themes.dark : themes.light)
     : (themes[themeKey] || themes.light)
@@ -81,6 +84,21 @@ export default function App() {
     }
   }
 
+  const handleTimeFormatChange = async (newFormat) => {
+    try {
+      const res = await apiFetch('/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ time_format: newFormat })
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setCurrentUser(updated)
+      }
+    } catch (err) {
+      console.error('Failed to update time format preference', err)
+    }
+  }
+
   const handleDayStartTimeChange = async (newStartTime) => {
     try {
       const res = await apiFetch('/auth/profile', {
@@ -109,7 +127,6 @@ export default function App() {
       if (res.ok) {
         const data = await res.json()
         setCalendars(data)
-
         setActiveCalendarIds((prev) => {
           const allIds = data.map((c) => c.id)
           if (currentUser) {
@@ -354,7 +371,7 @@ export default function App() {
             </button>
           </div>
         </div>
-        {/* Create Event Toggle Bar */}
+        
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
           <button
             type="button"
@@ -374,6 +391,7 @@ export default function App() {
             {showEventForm ? 'Close Form' : '+ Create New Event'}
           </button>
         </div>
+
         {showEventForm && (
           <EventForm
             calendars={calendars}
@@ -383,12 +401,14 @@ export default function App() {
             onCancel={() => setShowEventForm(false)}
           />
         )}
+
         <CalendarView
           calendarRef={calendarRef}
           events={visibleEvents}
           calendars={calendars}
           themeColors={resolvedTheme}
           dateFormat={dateFormat}
+          timeFormat={timeFormat}
           dayStartTime={dayStartTime}
           highlightedDate={selectedDate}
           onDateSelect={(dateStr) => {
@@ -397,6 +417,7 @@ export default function App() {
           }}
           onEventClick={(evt) => setModalEvent(evt)}
         />
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2rem', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
           <h2 style={{ margin: 0 }}>Events</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -460,6 +481,7 @@ export default function App() {
             )}
           </div>
         </div>
+
         <ul style={{ listStyle: 'none', padding: 0 }}>
           {filteredEvents.length > 0 ? (
             filteredEvents.map((evt) => (
@@ -469,6 +491,7 @@ export default function App() {
                 calendars={calendars}
                 theme={resolvedTheme}
                 dateFormat={dateFormat}
+                timeFormat={timeFormat}
                 onGoToCalendar={(dateStr) => {
                   window.scrollTo({ top: 0, behavior: 'smooth' })
                   setSelectedDate(dateStr)
@@ -486,6 +509,7 @@ export default function App() {
             <p style={{ color: resolvedTheme.subText }}>No events found matching your search or date range.</p>
           )}
         </ul>
+
         <EventModal
           isOpen={Boolean(modalEvent)}
           event={modalEvent}
@@ -508,6 +532,7 @@ export default function App() {
             fetchEvents()
           }}
         />
+
         <AccountSettingsModal
           isOpen={showAccountModal}
           onClose={() => setShowAccountModal(false)}
@@ -515,6 +540,7 @@ export default function App() {
           themeColors={resolvedTheme}
           onUserUpdated={fetchUser}
         />
+
         <DataSettingsModal
           isOpen={showDataModal}
           onClose={() => setShowDataModal(false)}
@@ -522,11 +548,13 @@ export default function App() {
           currentTheme={themeKey}
           themeColors={resolvedTheme}
           dateFormat={dateFormat}
+          timeFormat={timeFormat}
           dayStartTime={dayStartTime}
           calendars={calendars}
           activeCalendarIds={activeCalendarIds}
           onThemeChange={handleThemeChange}
           onDateFormatChange={handleDateFormatChange}
+          onTimeFormatChange={handleTimeFormatChange}
           onDayStartTimeChange={handleDayStartTimeChange}
           onEventsChanged={fetchEvents}
           onCalendarsChanged={() => {
@@ -536,6 +564,7 @@ export default function App() {
           onToggleCalendar={handleToggleCalendar}
         />
       </div>
+
       <footer
         style={{
           textAlign: 'center',
