@@ -19,6 +19,18 @@ export default function CalendarView({ events, themeColors, dateFormat, dayStart
     }
   }, [dayStartTime])
 
+  // Programmatically select and highlight the target date when "Go to Event" is clicked
+  useEffect(() => {
+    if (activeRef.current && highlightedDate) {
+      const calendarApi = activeRef.current.getApi()
+      calendarApi.gotoDate(highlightedDate)
+      setTimeout(() => {
+        calendarApi.unselect()
+        calendarApi.select(highlightedDate)
+      }, 50)
+    }
+  }, [highlightedDate])
+
   useEffect(() => {
     const timer = setTimeout(() => {
       const todayBtn = document.querySelector('.fc-today-button')
@@ -74,16 +86,6 @@ export default function CalendarView({ events, themeColors, dateFormat, dayStart
     }
     return mappedEvent
   })
-
-  if (highlightedDate) {
-    fcEvents.push({
-      id: 'highlight-date',
-      start: highlightedDate,
-      allDay: true,
-      display: 'background',
-      backgroundColor: `${themeColors.primary}35`
-    })
-  }
 
   return (
     <div
@@ -151,8 +153,20 @@ export default function CalendarView({ events, themeColors, dateFormat, dayStart
         .fc th, .fc td, .fc hr, .fc .fc-scrollgrid, .fc-theme-standard td, .fc-theme-standard th {
           border-color: ${themeColors.border} !important;
         }
+        /* Enhanced Today highlight styling */
         .fc .fc-day-today {
-          background-color: ${themeColors.primary}20 !important;
+          background-color: ${themeColors.primary}25 !important;
+          border: 2px solid ${themeColors.primary} !important;
+        }
+        .fc .fc-day-today .fc-daygrid-day-number {
+          font-weight: 800 !important;
+          color: ${themeColors.primary} !important;
+        }
+        /* Highly visible selected date highlight styling */
+        .fc .fc-highlight {
+          background-color: ${themeColors.primary}55 !important;
+          border: 2px dashed ${themeColors.primary} !important;
+          opacity: 1 !important;
         }
         .fc .fc-day-other .fc-daygrid-day-number {
           opacity: 0.5;
@@ -162,7 +176,6 @@ export default function CalendarView({ events, themeColors, dateFormat, dayStart
           border-radius: 4px;
           padding: 1px 2px;
         }
-
         /* FullCalendar +x more Popover Theming Fix */
         .fc-popover {
           background-color: ${themeColors.cardBg} !important;
@@ -243,7 +256,7 @@ export default function CalendarView({ events, themeColors, dateFormat, dayStart
           const priority = rawEvent ? rawEvent.priority : 'medium'
           const isAllDay = arg.event.allDay
           const timeStr = rawEvent && rawEvent.start_time ? rawEvent.start_time.slice(0, 5) : ''
-          
+                     
           const priorityLabel = priority === 'high' ? 'High' : priority === 'low' ? 'Low' : ''
           const priorityBg = priority === 'high' ? '#d32f2f' : priority === 'low' ? '#388e3c' : ''
           return (
