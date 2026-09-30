@@ -4,7 +4,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - JWT_SECRET=super-secret-key-change-this-for-production    
+      - JWT_SECRET=super-secret-key-change-this-for-production
+      - TZ=Europe/London
     volumes:
       - penguin_data:/app/data
       

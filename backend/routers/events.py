@@ -217,7 +217,6 @@ def get_import_batches(
         .order_by(ImportBatch.id.desc())
     ).all()
     
-    # Resolve calendar names for display context
     calendars = session.exec(select(Calendar)).all()
     cal_map = {c.id: c.name for c in calendars}
     
@@ -246,7 +245,7 @@ def import_ics_events(
     batch_id = str(uuid.uuid4())
     content = file.file.read()
     gcal = ICalCalendar.from_ical(content)
-    imported_count = 0
+    imported_count = int(0)
     
     for component in gcal.walk():
         if component.name == "VEVENT":
@@ -256,18 +255,26 @@ def import_ics_events(
             description = str(component.get('description', ''))
             if not start:
                 continue
+            
             start_dt = start.dt
             if hasattr(start_dt, 'strftime'):
+                if getattr(start_dt, 'tzinfo', None) is not None:
+                    start_dt = start_dt.astimezone().replace(tzinfo=None)
+                
                 date_str = start_dt.strftime("%Y-%m-%d")
                 time_str = start_dt.strftime("%H:%M") if hasattr(start_dt, 'hour') else None
             else:
                 date_str = str(start_dt)
                 time_str = None
+                
             end_time_str = None
             if end:
                 end_dt = end.dt
                 if hasattr(end_dt, 'strftime') and hasattr(end_dt, 'hour'):
+                    if getattr(end_dt, 'tzinfo', None) is not None:
+                        end_dt = end_dt.astimezone().replace(tzinfo=None)
                     end_time_str = end_dt.strftime("%H:%M")
+                    
             db_event = Event(
                 title=title,
                 date=date_str,
@@ -286,7 +293,6 @@ def import_ics_events(
             session.commit()
             imported_count += 1
             
-    # Record batch details
     import_batch = ImportBatch(
         batch_id=batch_id,
         user_id=current_user.id,
@@ -297,7 +303,7 @@ def import_ics_events(
     )
     session.add(import_batch)
     session.commit()
-            
+    
     return {
         "message": f"Successfully imported {imported_count} events from {file.filename}.",
         "batch_id": batch_id,
