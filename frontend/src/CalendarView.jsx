@@ -19,14 +19,11 @@ export default function CalendarView({ events, themeColors, dateFormat, timeForm
     }
   }, [dayStartTime])
 
+  // Fixed: Only jump to the date without forcing a conflicting .select() reset
   useEffect(() => {
     if (activeRef.current && highlightedDate) {
       const calendarApi = activeRef.current.getApi()
       calendarApi.gotoDate(highlightedDate)
-      setTimeout(() => {
-        calendarApi.unselect()
-        calendarApi.select(highlightedDate)
-      }, 50)
     }
   }, [highlightedDate])
 
@@ -40,8 +37,21 @@ export default function CalendarView({ events, themeColors, dateFormat, timeForm
     return () => clearTimeout(timer)
   }, [])
 
-  const handleDateClick = (arg) => {
-    if (onDateSelect) onDateSelect(arg.dateStr)
+  const handleDateSelect = (arg) => {
+    if (onDateSelect) {
+      const startStr = arg.startStr.slice(0, 10)
+      let endStr = startStr
+      if (arg.endStr) {
+        const rawEnd = new Date(arg.endStr)
+        if (!arg.allDay) {
+          endStr = arg.endStr.slice(0, 10)
+        } else {
+          rawEnd.setDate(rawEnd.getDate() - 1)
+          endStr = rawEnd.toISOString().slice(0, 10)
+        }
+      }
+      onDateSelect({ startDate: startStr, endDate: endStr })
+    }
   }
 
   const handleEventClick = (info) => {
@@ -240,8 +250,9 @@ export default function CalendarView({ events, themeColors, dateFormat, timeForm
         editable={false}
         selectable={true}
         selectMirror={true}
+        unselectAuto={false}
         dayMaxEvents={true}
-        dateClick={handleDateClick}
+        select={handleDateSelect}
         eventClick={handleEventClick}
         height="700px"
         slotLabelFormat={{

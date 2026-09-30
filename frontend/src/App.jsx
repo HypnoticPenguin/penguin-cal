@@ -17,6 +17,7 @@ export default function App() {
   const [activeCalendarIds, setActiveCalendarIds] = useState([])
   const [events, setEvents] = useState([])
   const [selectedDate, setSelectedDate] = useState('')
+  const [selectedEndDate, setSelectedEndDate] = useState('')
   const [modalEvent, setModalEvent] = useState(null)
   const [showAccountModal, setShowAccountModal] = useState(false)
   const [showDataModal, setShowDataModal] = useState(false)
@@ -398,6 +399,7 @@ export default function App() {
             theme={resolvedTheme}
             onEventAdded={fetchEvents}
             defaultDate={selectedDate}
+            defaultEndDate={selectedEndDate}
             onCancel={() => setShowEventForm(false)}
           />
         )}
@@ -411,8 +413,9 @@ export default function App() {
           timeFormat={timeFormat}
           dayStartTime={dayStartTime}
           highlightedDate={selectedDate}
-          onDateSelect={(dateStr) => {
-            setSelectedDate(dateStr)
+          onDateSelect={({ startDate, endDate }) => {
+            setSelectedDate(startDate)
+            setSelectedEndDate(endDate)
             setShowEventForm(true)
           }}
           onEventClick={(evt) => setModalEvent(evt)}
