@@ -93,11 +93,11 @@ export default function EventItem({ event, calendars, theme, dateFormat, timeFor
           <span style={{ fontSize: '0.85rem', color: theme.subText, flexShrink: 0, fontWeight: '500' }}>
             {formatDisplayDate(event.date)}
           </span>
-          <span 
-            style={{ 
-              fontWeight: 'bold', 
-              fontSize: '0.95rem', 
-              wordBreak: 'break-word', 
+          <span
+            style={{
+              fontWeight: 'bold',
+              fontSize: '0.95rem',
+              wordBreak: 'break-word',
               overflowWrap: 'break-word',
               whiteSpace: 'normal',
               flexGrow: 1
@@ -138,10 +138,17 @@ export default function EventItem({ event, calendars, theme, dateFormat, timeFor
           </p>
         )}
       </div>
-      <div className="event-item-actions" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+      <div
+        className="event-item-actions"
+        style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <button
           type="button"
-          onClick={() => onGoToCalendar(event.date)}
+          onClick={(e) => {
+            e.stopPropagation()
+            onGoToCalendar(event.date)
+          }}
           title="Jump to date on calendar"
           style={{ padding: '0.35rem 0.6rem', background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer' }}
         >
@@ -149,7 +156,10 @@ export default function EventItem({ event, calendars, theme, dateFormat, timeFor
         </button>
         <button
           type="button"
-          onClick={() => setShowDeleteConfirm(true)}
+          onClick={(e) => {
+            e.stopPropagation()
+            setShowDeleteConfirm(true)
+          }}
           style={{ padding: '0.35rem 0.6rem', background: '#d32f2f', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer' }}
         >
           Delete
@@ -160,18 +170,21 @@ export default function EventItem({ event, calendars, theme, dateFormat, timeFor
         title={event.is_recurring ? "Delete Recurring Event?" : "Delete Event?"}
         message={
           event.is_recurring
-            ? "Would you like to delete just this single instance or the entire series?"
+            ? "Are you sure you want to delete this recurring event series?"
             : "Are you sure you want to delete this event?"
         }
-        confirmText={event.is_recurring ? "Delete Series" : "Yes, Delete"}
+        confirmText="Yes, Delete"
         confirmColor="#d32f2f"
         theme={theme}
-        showInstanceOption={event.is_recurring}
-        onConfirm={(type) => {
+        onConfirm={(e) => {
+          e.stopPropagation()
           setShowDeleteConfirm(false)
-          onDelete(event.id, type, event.date)
+          onDelete(event.id, 'all', event.date)
         }}
-        onClose={() => setShowDeleteConfirm(false)}
+        onClose={(e) => {
+          if (e) e.stopPropagation()
+          setShowDeleteConfirm(false)
+        }}
       />
     </li>
   )
