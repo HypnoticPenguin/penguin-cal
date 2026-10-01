@@ -5,7 +5,6 @@ import ConfirmModal from './ConfirmModal.jsx'
 export default function EventItem({ event, calendars, theme, dateFormat, timeFormat = '12h', onGoToCalendar, onDelete, onEdit }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const isAllDay = !event.start_time && !event.end_time
-
   const priorityLabel = event.priority === 'high' ? 'High' : event.priority === 'low' ? 'Low' : ''
   const priorityBg = event.priority === 'high' ? '#d32f2f' : event.priority === 'low' ? '#388e3c' : ''
 
@@ -28,11 +27,9 @@ export default function EventItem({ event, calendars, theme, dateFormat, timeFor
     const [h, m] = timeStr.split(':')
     const hourNum = parseInt(h, 10)
     if (isNaN(hourNum)) return timeStr
-
     if (timeFormat === '24h') {
       return `${String(hourNum).padStart(2, '0')}:${m}`
     }
-
     const meridiem = hourNum >= 12 ? 'PM' : 'AM'
     const formattedHour = hourNum % 12 === 0 ? 12 : hourNum % 12
     return `${formattedHour}:${m} ${meridiem}`
@@ -96,7 +93,16 @@ export default function EventItem({ event, calendars, theme, dateFormat, timeFor
           <span style={{ fontSize: '0.85rem', color: theme.subText, flexShrink: 0, fontWeight: '500' }}>
             {formatDisplayDate(event.date)}
           </span>
-          <span style={{ fontWeight: 'bold', fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span 
+            style={{ 
+              fontWeight: 'bold', 
+              fontSize: '0.95rem', 
+              wordBreak: 'break-word', 
+              overflowWrap: 'break-word',
+              whiteSpace: 'normal',
+              flexGrow: 1
+            }}
+          >
             {event.title}
           </span>
           {isAllDay ? (
