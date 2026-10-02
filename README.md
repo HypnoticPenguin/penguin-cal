@@ -10,6 +10,8 @@
 * **Theme Customization**: Choose from multiple built-in themes (Light, Dark, Dracula, Nord, Solarized, Forest, Sunset) or stick with System Auto mode.
 * **User Roles & Admin Panel**: Role-based access control with an integrated administration panel for managing users, resetting passwords, and toggling admin permissions.
 * **Responsive Dashboard**: Fully responsive design tailored for both desktop and mobile views.
+* **Multi-architecture** : supports `linux/amd64`, `linux/arm64` and `linux/arm/v7` so it runs natively on standard PCs and Raspberry Pi home servers.
+
 
 <div style="display: flex; align-items: flex-start; gap: 10px;">
   <img src="frontend/public/cal1.png" width="30%" alt="Penguin Cal Screenshot 1" style="margin: 5px;" />
