@@ -24,7 +24,6 @@ export default function App() {
   const [showEventForm, setShowEventForm] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const calendarRef = useRef(null)
-
   const [systemPrefDark, setSystemPrefDark] = useState(
     window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : false
   )
@@ -41,7 +40,6 @@ export default function App() {
   const dateFormat = currentUser?.date_format || 'YYYY-MM-DD'
   const timeFormat = currentUser?.time_format || '12h'
   const dayStartTime = currentUser?.day_start_time || '06:00:00'
-
   const resolvedTheme = themeKey === 'auto'
     ? (systemPrefDark ? themes.dark : themes.light)
     : (themes[themeKey] || themes.light)
@@ -392,7 +390,6 @@ export default function App() {
             {showEventForm ? 'Close Form' : '+ Create New Event'}
           </button>
         </div>
-
         {showEventForm && (
           <EventForm
             calendars={calendars}
@@ -403,7 +400,6 @@ export default function App() {
             onCancel={() => setShowEventForm(false)}
           />
         )}
-
         <CalendarView
           calendarRef={calendarRef}
           events={visibleEvents}
@@ -416,11 +412,9 @@ export default function App() {
           onDateSelect={({ startDate, endDate }) => {
             setSelectedDate(startDate)
             setSelectedEndDate(endDate)
-            setShowEventForm(true)
           }}
           onEventClick={(evt) => setModalEvent(evt)}
         />
-
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2rem', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
           <h2 style={{ margin: 0 }}>Events</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -484,7 +478,6 @@ export default function App() {
             )}
           </div>
         </div>
-
         <ul style={{ listStyle: 'none', padding: 0 }}>
           {filteredEvents.length > 0 ? (
             filteredEvents.map((evt) => (
@@ -512,7 +505,6 @@ export default function App() {
             <p style={{ color: resolvedTheme.subText }}>No events found matching your search or date range.</p>
           )}
         </ul>
-
         <EventModal
           isOpen={Boolean(modalEvent)}
           event={modalEvent}
@@ -535,7 +527,6 @@ export default function App() {
             fetchEvents()
           }}
         />
-
         <AccountSettingsModal
           isOpen={showAccountModal}
           onClose={() => setShowAccountModal(false)}
@@ -543,7 +534,6 @@ export default function App() {
           themeColors={resolvedTheme}
           onUserUpdated={fetchUser}
         />
-
         <DataSettingsModal
           isOpen={showDataModal}
           onClose={() => setShowDataModal(false)}
@@ -567,7 +557,6 @@ export default function App() {
           onToggleCalendar={handleToggleCalendar}
         />
       </div>
-
       <footer
         style={{
           textAlign: 'center',
