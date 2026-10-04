@@ -19,11 +19,15 @@ export default function CalendarView({ events, themeColors, dateFormat, timeForm
     }
   }, [dayStartTime])
 
-  // Fixed: Only jump to the date without forcing a conflicting .select() reset
+  // Updated: Jump to the date AND trigger a visual selection/highlight
   useEffect(() => {
     if (activeRef.current && highlightedDate) {
       const calendarApi = activeRef.current.getApi()
       calendarApi.gotoDate(highlightedDate)
+      
+      // Select the specific date so FullCalendar highlights it visually
+      calendarApi.unselect()
+      calendarApi.select(highlightedDate)
     }
   }, [highlightedDate])
 
@@ -101,11 +105,9 @@ export default function CalendarView({ events, themeColors, dateFormat, timeForm
     const [h, m] = timeStr.split(':')
     const hourNum = parseInt(h, 10)
     if (isNaN(hourNum)) return timeStr
-
     if (timeFormat === '24h') {
       return `${String(hourNum).padStart(2, '0')}:${m}`
     }
-
     const meridiem = hourNum >= 12 ? 'PM' : 'AM'
     const formattedHour = hourNum % 12 === 0 ? 12 : hourNum % 12
     return `${formattedHour}:${m} ${meridiem}`
