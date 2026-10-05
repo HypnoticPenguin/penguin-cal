@@ -38,6 +38,7 @@ docker run -d \
   --network penguin-net \
   -v penguin_data:/app/data \
   -e JWT_SECRET=super-secret-key-change-this-for-production \
+  -e TZ=Europe/London \  
   --restart unless-stopped \
   mmozzano/penguin-cal-backend:latest
 
