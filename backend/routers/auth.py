@@ -31,6 +31,7 @@ def register_user(user_data: UserRegister, session: Session = Depends(get_sessio
         is_admin=is_first_user,
         theme="auto",
         date_format="YYYY-MM-DD",
+        time_format="12h",
         day_start_time="06:00:00"
     )
     session.add(new_user)
@@ -68,6 +69,7 @@ def get_me(current_user: User = Depends(get_current_user)):
         "is_admin": current_user.is_admin,
         "theme": current_user.theme or "auto",
         "date_format": current_user.date_format or "YYYY-MM-DD",
+        "time_format": current_user.time_format or "12h",
         "day_start_time": current_user.day_start_time or "06:00:00"
     }
 
@@ -89,6 +91,9 @@ def update_profile(
     if profile_data.date_format is not None:
         current_user.date_format = profile_data.date_format
 
+    if profile_data.time_format is not None:
+        current_user.time_format = profile_data.time_format
+
     if profile_data.day_start_time is not None:
         current_user.day_start_time = profile_data.day_start_time
         
@@ -103,6 +108,7 @@ def update_profile(
         "is_admin": current_user.is_admin,
         "theme": current_user.theme,
         "date_format": current_user.date_format,
+        "time_format": current_user.time_format,
         "day_start_time": current_user.day_start_time
     }
 

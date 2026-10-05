@@ -1,15 +1,16 @@
 services:
   backend:
-    image: mmozzano/penguin-cal-backend:latest
+    image: mmozzano/penguin-calendar-backend:latest
     ports:
       - "8000:8000"
     environment:
-      - JWT_SECRET=super-secret-key-change-this-for-production    
+      - JWT_SECRET=super-secret-key-change-this-for-production
+      - TZ=Europe/London
     volumes:
       - penguin_data:/app/data
       
   frontend:
-    image: mmozzano/penguin-cal-frontend:latest
+    image: mmozzano/penguin-calendar-frontend:latest
     ports:
       - "80:80"
     depends_on:

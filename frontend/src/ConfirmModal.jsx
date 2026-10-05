@@ -10,6 +10,7 @@ export default function ConfirmModal({ isOpen, title, message, confirmText = 'Co
 
   return (
     <div
+      onClick={(e) => e.stopPropagation()} // <-- Stops clicks inside the modal from bubbling up to parent elements
       style={{
         position: 'fixed',
         top: 0,
@@ -24,12 +25,13 @@ export default function ConfirmModal({ isOpen, title, message, confirmText = 'Co
       }}
     >
       <div
+        onClick={(e) => e.stopPropagation()} // <-- Extra safety wrapper stopPropagation
         style={{
           background: activeTheme.cardBg,
           color: activeTheme.text,
           padding: '1.5rem',
           borderRadius: '8px',
-          maxWidth: '400px',
+          maxWidth: '480px',
           width: '100%',
           border: `1px solid ${activeTheme.border}`,
           boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
@@ -38,7 +40,15 @@ export default function ConfirmModal({ isOpen, title, message, confirmText = 'Co
         }}
       >
         <h3 style={{ margin: '0 0 0.75rem 0', color: confirmColor }}>{title}</h3>
-        <p style={{ fontSize: '0.9rem', marginBottom: '1.25rem', lineHeight: '1.4' }}>
+        <p
+          style={{
+            fontSize: '0.9rem',
+            marginBottom: '1.25rem',
+            lineHeight: '1.4',
+            wordBreak: 'break-word',
+            overflowWrap: 'break-word'
+          }}
+        >
           {message}
         </p>
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>

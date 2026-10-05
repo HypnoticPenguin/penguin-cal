@@ -5,11 +5,11 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import rrulePlugin from '@fullcalendar/rrule'
 
-export default function CalendarView({ events, themeColors, dateFormat, dayStartTime = '06:00:00', onDateSelect, onEventClick, calendarRef, highlightedDate }) {
+export default function CalendarView({ events, themeColors, dateFormat, timeFormat = '12h', dayStartTime = '06:00:00', onDateSelect, onEventClick, calendarRef, highlightedDate }) {
   const internalCalendarRef = useRef(null)
   const activeRef = calendarRef || internalCalendarRef
+  const is12h = timeFormat === '12h'
 
-  // Instantly scroll to the new start time whenever dayStartTime changes
   useEffect(() => {
     if (activeRef.current) {
       const calendarApi = activeRef.current.getApi()
@@ -18,6 +18,18 @@ export default function CalendarView({ events, themeColors, dateFormat, dayStart
       }
     }
   }, [dayStartTime])
+
+  // Updated: Jump to the date AND trigger a visual selection/highlight
+  useEffect(() => {
+    if (activeRef.current && highlightedDate) {
+      const calendarApi = activeRef.current.getApi()
+      calendarApi.gotoDate(highlightedDate)
+      
+      // Select the specific date so FullCalendar highlights it visually
+      calendarApi.unselect()
+      calendarApi.select(highlightedDate)
+    }
+  }, [highlightedDate])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -29,8 +41,21 @@ export default function CalendarView({ events, themeColors, dateFormat, dayStart
     return () => clearTimeout(timer)
   }, [])
 
-  const handleDateClick = (arg) => {
-    if (onDateSelect) onDateSelect(arg.dateStr)
+  const handleDateSelect = (arg) => {
+    if (onDateSelect) {
+      const startStr = arg.startStr.slice(0, 10)
+      let endStr = startStr
+      if (arg.endStr) {
+        const rawEnd = new Date(arg.endStr)
+        if (!arg.allDay) {
+          endStr = arg.endStr.slice(0, 10)
+        } else {
+          rawEnd.setDate(rawEnd.getDate() - 1)
+          endStr = rawEnd.toISOString().slice(0, 10)
+        }
+      }
+      onDateSelect({ startDate: startStr, endDate: endStr })
+    }
   }
 
   const handleEventClick = (info) => {
@@ -75,14 +100,17 @@ export default function CalendarView({ events, themeColors, dateFormat, dayStart
     return mappedEvent
   })
 
-  if (highlightedDate) {
-    fcEvents.push({
-      id: 'highlight-date',
-      start: highlightedDate,
-      allDay: true,
-      display: 'background',
-      backgroundColor: `${themeColors.primary}35`
-    })
+  const formatEventTimeStr = (timeStr) => {
+    if (!timeStr) return ''
+    const [h, m] = timeStr.split(':')
+    const hourNum = parseInt(h, 10)
+    if (isNaN(hourNum)) return timeStr
+    if (timeFormat === '24h') {
+      return `${String(hourNum).padStart(2, '0')}:${m}`
+    }
+    const meridiem = hourNum >= 12 ? 'PM' : 'AM'
+    const formattedHour = hourNum % 12 === 0 ? 12 : hourNum % 12
+    return `${formattedHour}:${m} ${meridiem}`
   }
 
   return (
@@ -152,7 +180,17 @@ export default function CalendarView({ events, themeColors, dateFormat, dayStart
           border-color: ${themeColors.border} !important;
         }
         .fc .fc-day-today {
-          background-color: ${themeColors.primary}20 !important;
+          background-color: ${themeColors.primary}25 !important;
+          border: 2px solid ${themeColors.primary} !important;
+        }
+        .fc .fc-day-today .fc-daygrid-day-number {
+          font-weight: 800 !important;
+          color: ${themeColors.primary} !important;
+        }
+        .fc .fc-highlight {
+          background-color: ${themeColors.primary}55 !important;
+          border: 2px dashed ${themeColors.primary} !important;
+          opacity: 1 !important;
         }
         .fc .fc-day-other .fc-daygrid-day-number {
           opacity: 0.5;
@@ -162,8 +200,6 @@ export default function CalendarView({ events, themeColors, dateFormat, dayStart
           border-radius: 4px;
           padding: 1px 2px;
         }
-
-        /* FullCalendar +x more Popover Theming Fix */
         .fc-popover {
           background-color: ${themeColors.cardBg} !important;
           color: ${themeColors.text} !important;
@@ -216,20 +252,23 @@ export default function CalendarView({ events, themeColors, dateFormat, dayStart
         editable={false}
         selectable={true}
         selectMirror={true}
+        unselectAuto={false}
         dayMaxEvents={true}
-        dateClick={handleDateClick}
+        select={handleDateSelect}
         eventClick={handleEventClick}
         height="700px"
         slotLabelFormat={{
           hour: 'numeric',
           minute: '2-digit',
           omitZeroMinute: false,
-          meridiem: 'short'
+          meridiem: is12h ? 'short' : false,
+          hour12: is12h
         }}
         eventTimeFormat={{
           hour: 'numeric',
           minute: '2-digit',
-          meridiem: 'short'
+          meridiem: is12h ? 'short' : false,
+          hour12: is12h
         }}
         eventDidMount={(info) => {
           if (info.event.backgroundColor) {
@@ -242,7 +281,7 @@ export default function CalendarView({ events, themeColors, dateFormat, dayStart
           const rawEvent = arg.event.extendedProps.rawEvent
           const priority = rawEvent ? rawEvent.priority : 'medium'
           const isAllDay = arg.event.allDay
-          const timeStr = rawEvent && rawEvent.start_time ? rawEvent.start_time.slice(0, 5) : ''
+          const timeStr = rawEvent && rawEvent.start_time ? formatEventTimeStr(rawEvent.start_time.slice(0, 5)) : ''
           
           const priorityLabel = priority === 'high' ? 'High' : priority === 'low' ? 'Low' : ''
           const priorityBg = priority === 'high' ? '#d32f2f' : priority === 'low' ? '#388e3c' : ''

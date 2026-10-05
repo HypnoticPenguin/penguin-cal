@@ -21,7 +21,9 @@ def list_users(
             "display_name": u.display_name or u.username,
             "is_admin": u.is_admin,
             "theme": u.theme or "auto",
-            "date_format": u.date_format or "YYYY-MM-DD"
+            "date_format": u.date_format or "YYYY-MM-DD",
+            "time_format": u.time_format or "12h",
+            "day_start_time": u.day_start_time or "06:00:00"
         }
         for u in users
     ]
@@ -35,6 +37,7 @@ def delete_user(
     target_user = session.get(User, user_id)
     if not target_user or target_user.id == admin.id:
         raise HTTPException(status_code=400, detail="Invalid user deletion target")
+    
     session.delete(target_user)
     session.commit()
     return {"message": f"User '{target_user.username}' deleted."}
@@ -48,6 +51,7 @@ def toggle_admin_status(
     target_user = session.get(User, user_id)
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
+    
     if target_user.id == admin.id:
         raise HTTPException(status_code=400, detail="Cannot modify your own admin privileges")
         

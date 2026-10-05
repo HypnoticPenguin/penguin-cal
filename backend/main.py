@@ -1,10 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from database import init_db
 from routers import auth, calendars, events, admin
 
-app = FastAPI(title="Penguin Cal API")
+app = FastAPI(title="Penguin Calendar API")
 
 app.add_middleware(
     CORSMiddleware,

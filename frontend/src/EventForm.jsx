@@ -4,9 +4,10 @@ import RecurrenceBuilder from './RecurrenceBuilder.jsx'
 import { useEventTime } from './hooks/useEventTime.js'
 import { buildRruleString } from './utils/recurrence.js'
 
-export default function EventForm({ calendars, theme, onEventAdded, defaultDate, onCancel }) {
+export default function EventForm({ calendars, theme, onEventAdded, defaultDate, defaultEndDate, onCancel }) {
   const [title, setTitle] = useState('')
   const [date, setDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [notes, setNotes] = useState('')
   const [priority, setPriority] = useState('medium')
   const [selectedCalIds, setSelectedCalIds] = useState([])
@@ -21,7 +22,6 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate,
     timeError
   } = useEventTime()
 
-  // Advanced Recurrence States
   const [freq, setFreq] = useState('')
   const [interval, setInterval] = useState(1)
   const [endType, setEndType] = useState('never')
@@ -40,14 +40,16 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate,
   useEffect(() => {
     if (defaultDate) {
       setDate(defaultDate)
+      setEndDate(defaultEndDate || defaultDate)
       const d = new Date(defaultDate)
       if (!isNaN(d.getDate())) setMonthDay(d.getDate())
     }
-  }, [defaultDate])
+  }, [defaultDate, defaultEndDate])
 
   const setTodayDate = () => {
     const todayStr = new Date().toISOString().slice(0, 10)
     setDate(todayStr)
+    setEndDate(todayStr)
     setMonthDay(new Date().getDate())
   }
 
@@ -60,9 +62,16 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate,
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!title || !date || selectedCalIds.length === 0) return
-         
     if (!validateTimes()) return
     setIsSubmitting(true)
+    
+    // If a multi-day range is selected, append the end date info into notes or handle accordingly
+    let finalNotes = notes || ''
+    if (endDate && endDate !== date) {
+      const rangeNote = `[Multi-day event: ${date} to ${endDate}]`
+      finalNotes = finalNotes ? `${finalNotes}\n${rangeNote}` : rangeNote
+    }
+
     const rrule = buildRruleString({
       freq,
       interval,
@@ -80,7 +89,7 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate,
           date,
           start_time: startTime || null,
           end_time: endTime || null,
-          notes: notes || null,
+          notes: finalNotes ? finalNotes : null,
           priority,
           calendar_ids: selectedCalIds,
           rrule
@@ -90,6 +99,7 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate,
         onEventAdded()
         setTitle('')
         setDate('')
+        setEndDate('')
         setStartTime('')
         setEndTime('')
         setNotes('')
@@ -162,14 +172,27 @@ export default function EventForm({ calendars, theme, onEventAdded, defaultDate,
           required
           style={{ ...inputStyle, flexGrow: 1, minWidth: '100%' }}
         />
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', width: '100%' }}>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            required
-            style={{ ...inputStyle, flexGrow: 1 }}
-          />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', width: '100%', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flex: 1, minWidth: '200px' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: theme.subText }}>From:</span>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              required
+              style={{ ...inputStyle, flexGrow: 1 }}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flex: 1, minWidth: '200px' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: theme.subText }}>To:</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              required
+              style={{ ...inputStyle, flexGrow: 1 }}
+            />
+          </div>
           <button
             type="button"
             onClick={setTodayDate}

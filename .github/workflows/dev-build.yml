@@ -28,13 +28,14 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile
           push: true
-          tags: mmozzano/penguin-cal-backend:dev
+          tags: mmozzano/penguin-calendar-backend:dev
 
       # Build and push Frontend image tagged as 'dev'
       - name: Build and push Frontend Dev Image
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
+          platforms: linux/amd64,linux/arm64,linux/arm/v7                     
           file: ./frontend/Dockerfile
           push: true
-          tags: mmozzano/penguin-cal-frontend:dev
+          tags: mmozzano/penguin-calendar-frontend:dev

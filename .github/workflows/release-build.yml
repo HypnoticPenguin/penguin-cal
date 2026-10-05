@@ -101,15 +101,16 @@ jobs:
           file: ./backend/Dockerfile
           push: true
           tags: |
-            mmozzano/penguin-cal-backend:latest
-            mmozzano/penguin-cal-backend:${{ steps.version-bump.outputs.NEW_VERSION }}
+            mmozzano/penguin-calendar-backend:latest
+            mmozzano/penguin-calendar-backend:${{ steps.version-bump.outputs.NEW_VERSION }}
 
       - name: Build and Push Frontend Docker Image
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
+          platforms: linux/amd64,linux/arm64,linux/arm/v7                     
           file: ./frontend/Dockerfile
           push: true
           tags: |
-            mmozzano/penguin-cal-frontend:latest
-            mmozzano/penguin-cal-frontend:${{ steps.version-bump.outputs.NEW_VERSION }}
+            mmozzano/penguin-calendar-frontend:latest
+            mmozzano/penguin-calendar-frontend:${{ steps.version-bump.outputs.NEW_VERSION }}

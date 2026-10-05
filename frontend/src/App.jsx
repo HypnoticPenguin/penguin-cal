@@ -17,6 +17,7 @@ export default function App() {
   const [activeCalendarIds, setActiveCalendarIds] = useState([])
   const [events, setEvents] = useState([])
   const [selectedDate, setSelectedDate] = useState('')
+  const [selectedEndDate, setSelectedEndDate] = useState('')
   const [modalEvent, setModalEvent] = useState(null)
   const [showAccountModal, setShowAccountModal] = useState(false)
   const [showDataModal, setShowDataModal] = useState(false)
@@ -38,6 +39,7 @@ export default function App() {
 
   const themeKey = currentUser?.theme || 'auto'
   const dateFormat = currentUser?.date_format || 'YYYY-MM-DD'
+  const timeFormat = currentUser?.time_format || '12h'
   const dayStartTime = currentUser?.day_start_time || '06:00:00'
 
   const resolvedTheme = themeKey === 'auto'
@@ -83,6 +85,21 @@ export default function App() {
     }
   }
 
+  const handleTimeFormatChange = async (newFormat) => {
+    try {
+      const res = await apiFetch('/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ time_format: newFormat })
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setCurrentUser(updated)
+      }
+    } catch (err) {
+      console.error('Failed to update time format preference', err)
+    }
+  }
+
   const handleDayStartTimeChange = async (newStartTime) => {
     try {
       const res = await apiFetch('/auth/profile', {
@@ -111,7 +128,6 @@ export default function App() {
       if (res.ok) {
         const data = await res.json()
         setCalendars(data)
-        
         setActiveCalendarIds((prev) => {
           const allIds = data.map((c) => c.id)
           if (currentUser) {
@@ -227,7 +243,7 @@ export default function App() {
             rel="noopener noreferrer"
             style={{ color: resolvedTheme.primary, textDecoration: 'none', fontFamily: 'sans-serif' }}
           >
-            Penguin Cal v{pkg.version}
+            Penguin Calendar v{pkg.version}
           </a> &copy; {new Date().getFullYear()}
         </footer>
       </div>
@@ -324,10 +340,10 @@ export default function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <img
               src="/penguin-logo.svg"
-              alt="Penguin Cal Logo"
+              alt="Penguin Calendar Logo"
               style={{ width: '40px', height: '40px', objectFit: 'contain' }}
             />
-            <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Penguin Cal</h1>
+            <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Penguin Calendar</h1>
           </div>
           <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.9rem' }}>
@@ -357,7 +373,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Create Event Toggle Bar */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
           <button
             type="button"
@@ -384,6 +399,7 @@ export default function App() {
             theme={resolvedTheme}
             onEventAdded={fetchEvents}
             defaultDate={selectedDate}
+            defaultEndDate={selectedEndDate}
             onCancel={() => setShowEventForm(false)}
           />
         )}
@@ -394,11 +410,12 @@ export default function App() {
           calendars={calendars}
           themeColors={resolvedTheme}
           dateFormat={dateFormat}
+          timeFormat={timeFormat}
           dayStartTime={dayStartTime}
           highlightedDate={selectedDate}
-          onDateSelect={(dateStr) => {
-            setSelectedDate(dateStr)
-            setShowEventForm(true)
+          onDateSelect={({ startDate, endDate }) => {
+            setSelectedDate(startDate)
+            setSelectedEndDate(endDate)
           }}
           onEventClick={(evt) => setModalEvent(evt)}
         />
@@ -438,6 +455,7 @@ export default function App() {
                 </button>
               )}
             </div>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem' }}>
               <span style={{ fontWeight: 'bold', color: resolvedTheme.subText }}>From:</span>
               <input
@@ -447,6 +465,7 @@ export default function App() {
                 style={{ padding: '0.25rem 0.4rem', background: resolvedTheme.cardBg, color: resolvedTheme.text, border: `1px solid ${resolvedTheme.border}`, borderRadius: '4px' }}
               />
             </div>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem' }}>
               <span style={{ fontWeight: 'bold', color: resolvedTheme.subText }}>To:</span>
               <input
@@ -456,6 +475,7 @@ export default function App() {
                 style={{ padding: '0.25rem 0.4rem', background: resolvedTheme.cardBg, color: resolvedTheme.text, border: `1px solid ${resolvedTheme.border}`, borderRadius: '4px' }}
               />
             </div>
+
             {(filterStartDate !== todayStr || filterEndDate !== futureStr) && (
               <button
                 onClick={() => { setFilterStartDate(todayStr); setFilterEndDate(futureStr); }}
@@ -476,21 +496,18 @@ export default function App() {
                 calendars={calendars}
                 theme={resolvedTheme}
                 dateFormat={dateFormat}
+                timeFormat={timeFormat}
                 onGoToCalendar={(dateStr) => {
                   window.scrollTo({ top: 0, behavior: 'smooth' })
                   setSelectedDate(dateStr)
-                  if (calendarRef.current) {
-                    const calendarApi = calendarRef.current.getApi()
-                    calendarApi.gotoDate(dateStr)
-                  }
                 }}
+                onEdit={() => setModalEvent(evt)}
                 onDelete={async (id, type, date) => {
                   let url = `/events/${id}?delete_type=${type}`
                   if (date) url += `&instance_date=${date}`
                   await apiFetch(url, { method: 'DELETE' })
                   fetchEvents()
                 }}
-                onUpdate={fetchEvents}
               />
             ))
           ) : (
@@ -536,11 +553,13 @@ export default function App() {
           currentTheme={themeKey}
           themeColors={resolvedTheme}
           dateFormat={dateFormat}
+          timeFormat={timeFormat}
           dayStartTime={dayStartTime}
           calendars={calendars}
           activeCalendarIds={activeCalendarIds}
           onThemeChange={handleThemeChange}
           onDateFormatChange={handleDateFormatChange}
+          onTimeFormatChange={handleTimeFormatChange}
           onDayStartTimeChange={handleDayStartTimeChange}
           onEventsChanged={fetchEvents}
           onCalendarsChanged={() => {
@@ -549,7 +568,6 @@ export default function App() {
           }}
           onToggleCalendar={handleToggleCalendar}
         />
-
       </div>
 
       <footer
@@ -571,7 +589,7 @@ export default function App() {
           rel="noopener noreferrer"
           style={{ color: resolvedTheme.primary, textDecoration: 'none', fontFamily: 'sans-serif' }}
         >
-          Penguin Cal v{pkg.version}
+          Penguin Calendar v{pkg.version}
         </a> &copy; {new Date().getFullYear()}
       </footer>
     </div>

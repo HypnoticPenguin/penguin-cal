@@ -15,11 +15,13 @@ export default function DataSettingsModal({
   currentTheme,
   themeColors,
   dateFormat,
+  timeFormat,
   dayStartTime,
   calendars = [],
   activeCalendarIds = [],
   onThemeChange,
   onDateFormatChange,
+  onTimeFormatChange,
   onDayStartTimeChange,
   onEventsChanged,
   onCalendarsChanged,
@@ -28,29 +30,24 @@ export default function DataSettingsModal({
   const [cleanupMsg, setCleanupMsg] = useState({ text: '', isError: false })
   const [isCleaning, setIsCleaning] = useState(false)
   const [showCleanupConfirm, setShowCleanupConfirm] = useState(false)
-  
   const [importCalId, setImportCalId] = useState('')
   const [importFile, setImportFile] = useState(null)
   const [importLoading, setImportLoading] = useState(false)
   const [importMessage, setImportMessage] = useState('')
   
-  // Persistent Import Batches History State
   const [importBatches, setImportBatches] = useState([])
   const [undoBatchTarget, setUndoBatchTarget] = useState(null)
 
-  // Calendar Management States
   const [showCreateCal, setShowCreateCal] = useState(false)
   const [newCalName, setNewCalName] = useState('')
   const [newCalColor, setNewCalColor] = useState('#2196F3')
   const [calMsg, setCalMsg] = useState({ text: '', isError: false })
   const [deleteCalTarget, setDeleteCalTarget] = useState(null)
 
-  // Calendar Editing State
   const [editingCalId, setEditingCalId] = useState(null)
   const [editCalName, setEditCalName] = useState('')
   const [editCalColor, setEditCalColor] = useState('#2196F3')
 
-  // Calendar Sharing States
   const [shareUsers, setShareUsers] = useState([])
   const [selectedShareCalId, setSelectedShareCalId] = useState(null)
 
@@ -131,7 +128,6 @@ export default function DataSettingsModal({
             localStorage.setItem(`active_cals_${currentUser.id}`, JSON.stringify(currentActive))
           }
         }
-
         if (onCalendarsChanged) onCalendarsChanged()
       } else {
         const data = await res.json()
@@ -344,6 +340,21 @@ export default function DataSettingsModal({
     }
   }
 
+  const formatStartTimeOption = (timeStr) => {
+    const [h, m] = timeStr.split(':')
+    const hourNum = parseInt(h, 10)
+    if (isNaN(hourNum)) return timeStr
+
+    if (timeFormat === '24h') {
+      return `${String(hourNum).padStart(2, '0')}:${m}`
+    }
+
+    if (hourNum === 0 && m === '00') return '12:00 AM (Midnight)'
+    const meridiem = hourNum >= 12 ? 'PM' : 'AM'
+    const formattedHour = hourNum % 12 === 0 ? 12 : hourNum % 12
+    return `${formattedHour}:${m} ${meridiem}`
+  }
+
   const inputStyle = {
     width: '100%',
     padding: '0.5rem',
@@ -386,7 +397,6 @@ export default function DataSettingsModal({
       >
         <h2 style={{ marginTop: 0, marginBottom: '1.25rem' }}>Calendar & App Settings</h2>
 
-        {/* Calendar Management & Visibility Section */}
         <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
             <h3 style={{ margin: 0 }}>Calendar Management & Visibility</h3>
@@ -401,13 +411,11 @@ export default function DataSettingsModal({
           <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.8rem', color: themeColors.subText }}>
             Create new calendars, or check/uncheck existing ones to show and hide them on your main calendar view. You can also manage sharing, edits, exports, and deletes below.
           </p>
-
           {calMsg.text && (
             <p style={{ color: calMsg.isError ? '#ff5252' : '#66bb6a', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
               {calMsg.text}
             </p>
           )}
-
           {showCreateCal && (
             <form onSubmit={handleCreateCalendar} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '1rem', background: themeColors.bg, padding: '0.75rem', borderRadius: '6px', border: `1px solid ${themeColors.border}` }}>
               <input
@@ -435,12 +443,10 @@ export default function DataSettingsModal({
               </button>
             </form>
           )}
-
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {calendars.map((cal) => {
               const isVisible = activeCalendarIds.includes(cal.id)
               const isEditing = editingCalId === cal.id
-
               return (
                 <div
                   key={cal.id}
@@ -462,7 +468,6 @@ export default function DataSettingsModal({
                         title="Toggle calendar visibility"
                         style={{ cursor: 'pointer' }}
                       />
-
                       {isEditing ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexGrow: 1, flexWrap: 'wrap' }}>
                           <input
@@ -504,7 +509,6 @@ export default function DataSettingsModal({
                         </>
                       )}
                     </div>
-
                     {!isEditing && (
                       <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                         {!cal.is_default && cal.is_owner && (
@@ -544,7 +548,6 @@ export default function DataSettingsModal({
                       </div>
                     )}
                   </div>
-
                   {selectedShareCalId === cal.id && (
                     <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: `1px dashed ${themeColors.border}` }}>
                       <span style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '0.4rem' }}>
@@ -574,7 +577,6 @@ export default function DataSettingsModal({
           </div>
         </div>
 
-        {/* Appearance Section */}
         <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
           <h3 style={{ margin: '0 0 0.75rem 0' }}>Appearance</h3>
           <div style={{ marginBottom: '0.75rem' }}>
@@ -603,6 +605,17 @@ export default function DataSettingsModal({
               <option value="DD-Mon-YYYY">DD-Mon-YYYY (e.g. 24-Sep-2026)</option>
             </select>
           </div>
+          <div style={{ marginBottom: '0.75rem' }}>
+            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Time Format</label>
+            <select
+              value={timeFormat}
+              onChange={(e) => onTimeFormatChange(e.target.value)}
+              style={inputStyle}
+            >
+              <option value="12h">12-hour (e.g. 3:30 PM)</option>
+              <option value="24h">24-hour (e.g. 15:30)</option>
+            </select>
+          </div>
           <div>
             <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Day/Week View Start Time</label>
             <select
@@ -610,16 +623,15 @@ export default function DataSettingsModal({
               onChange={(e) => onDayStartTimeChange(e.target.value)}
               style={inputStyle}
             >
-              <option value="00:00:00">12:00 AM (Midnight)</option>
-              <option value="06:00:00">6:00 AM</option>
-              <option value="07:00:00">7:00 AM</option>
-              <option value="08:00:00">8:00 AM</option>
-              <option value="09:00:00">9:00 AM</option>
+              <option value="00:00:00">{formatStartTimeOption('00:00:00')}</option>
+              <option value="06:00:00">{formatStartTimeOption('06:00:00')}</option>
+              <option value="07:00:00">{formatStartTimeOption('07:00:00')}</option>
+              <option value="08:00:00">{formatStartTimeOption('08:00:00')}</option>
+              <option value="09:00:00">{formatStartTimeOption('09:00:00')}</option>
             </select>
           </div>
         </div>
 
-        {/* Data Management & Imports */}
         <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
           <h3 style={{ margin: '0 0 0.75rem 0' }}>Data Management & Imports</h3>
           
@@ -661,7 +673,6 @@ export default function DataSettingsModal({
                 {importLoading ? 'Importing...' : 'Import Events'}
               </button>
             </form>
-
             <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: `1px dashed ${themeColors.border}` }}>
               <h5 style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem', color: themeColors.subText }}>Recent Imports & Rollbacks</h5>
               {importBatches.length === 0 ? (
@@ -686,7 +697,7 @@ export default function DataSettingsModal({
                       <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         <strong>{batch.filename}</strong> ({batch.event_count} events)<br />
                         <span style={{ fontSize: '0.7rem', color: themeColors.subText }}>
-                          To: {batch.calendar_name} • {batch.imported_at}
+                          To: {batch.calendar_name}   {batch.imported_at}
                         </span>
                       </div>
                       <button

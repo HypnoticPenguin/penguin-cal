@@ -1,6 +1,8 @@
 services:
   backend:
-    image: mmozzano/penguin-cal-backend:latest
+    image: mmozzano/penguin-calendar-backend:latest
+    environment:
+      - TZ=Europe/London
     container_name: ${SERVICE:-penguin}-backend
     restart: unless-stopped
     init: true
@@ -11,7 +13,7 @@ services:
       - penguin_data:/app/data
 
   frontend:
-    image: mmozzano/penguin-cal-frontend:latest
+    image: mmozzano/penguin-calendar-frontend:latest
     container_name: ${SERVICE:-penguin}
     restart: unless-stopped
     init: true
