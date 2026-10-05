@@ -21,10 +21,9 @@ export default function AuthForm({ onAuthSuccess, theme }) {
     e.preventDefault()
     setError('')
     setLoading(true)
-    
+
     // Ensure /api prefix is present
     const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register'
-
     try {
       let response
       if (isLogin) {
@@ -40,11 +39,11 @@ export default function AuthForm({ onAuthSuccess, theme }) {
         response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-             username, 
-             display_name: displayName || username, 
-             password 
-           }),
+          body: JSON.stringify({
+              username,
+              display_name: displayName || username,
+              password
+            }),
         })
       }
 
@@ -112,11 +111,11 @@ export default function AuthForm({ onAuthSuccess, theme }) {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
           <img
             src="/penguin-logo.svg"
-            alt="Penguin Cal Logo"
+            alt="Penguin Calendar Logo"
             style={{ width: '54px', height: '54px', objectFit: 'contain' }}
           />
           <h2 style={{ textAlign: 'center', margin: 0, color: activeTheme.text }}>
-            {isLogin ? 'Welcome to Penguin Cal' : 'Create Account'}
+            {isLogin ? 'Welcome to Penguin Calendar' : 'Create Account'}
           </h2>
         </div>
 

@@ -1,6 +1,6 @@
-# Penguin Cal
+# Penguin Calendar
 
-**Penguin Cal** is a lightweight, multi-calendar suite built with a FastAPI backend and a React (Vite & FullCalendar) frontend. It supports advanced event management, recurring schedules (RRULE), calendar sharing, .ics file imports/exports, theme customizations, and built-in user administration.
+**Penguin Calendar** is a lightweight, multi-calendar suite built with a FastAPI backend and a React (Vite & FullCalendar) frontend. It supports advanced event management, recurring schedules (RRULE), calendar sharing, .ics file imports/exports, theme customizations, and built-in user administration.
 
 ## Features
 * **Multi-Calendar Support**: Create, customize, and organize events across multiple personal or shared calendars.
@@ -14,8 +14,8 @@
 
 
 <div style="display: flex; align-items: flex-start; gap: 10px;">
-  <img src="frontend/public/cal1.png" width="30%" alt="Penguin Cal Screenshot 1" style="margin: 5px;" />
-  <img src="frontend/public/cal2.png" width="30%" alt="Penguin Cal Screenshot 2" style="margin: 5px;" />
+  <img src="frontend/public/cal1.png" width="30%" alt="Penguin Calendar Screenshot 1" style="margin: 5px;" />
+  <img src="frontend/public/cal2.png" width="30%" alt="Penguin Calendar Screenshot 2" style="margin: 5px;" />
 </div>
 
 ## Running with Docker
@@ -75,8 +75,8 @@ To run the production setup configured with Traefik routing and Homepage label i
 
 ```env
 DOMAIN=yourdomain.com
-SERVICE=cal
-SERVICE_NAME=Penguin Cal
+SERVICE=calendar
+SERVICE_NAME=Penguin Calendar
 GROUP=Applications
 DESCRIPTION=Lightweight multi-calendar suite
 JWT_SECRET=super-secret-key-change-this-for-production
