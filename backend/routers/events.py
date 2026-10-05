@@ -1,5 +1,7 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+import os
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from fastapi.responses import Response
@@ -40,6 +42,7 @@ def get_events(
         primary_cal = cal_map.get(sorted_cal_ids[0]) if sorted_cal_ids else None
         color = primary_cal.color if primary_cal else "#2196F3"
         exdates_list = [x.strip() for x in event.exdates.split(",")] if event.exdates else []
+        
         output.append({
             "id": event.id,
             "title": event.title,
@@ -178,11 +181,11 @@ def export_calendar_ics(
         date_parts = [int(p) for p in event.date.split('-')]
         event_date = datetime(date_parts[0], date_parts[1], date_parts[2])
         if event.start_time:
-            start_h, start_m = map(int, event.start_time.split(':'))
+            start_h, start_m = map(int, event.start_time.split(':')[:2])
             start_dt = event_date.replace(hour=start_h, minute=start_m)
             ical_event.add('dtstart', start_dt)
             if event.end_time:
-                end_h, end_m = map(int, event.end_time.split(':'))
+                end_h, end_m = map(int, event.end_time.split(':')[:2])
                 end_dt = event_date.replace(hour=end_h, minute=end_m)
                 ical_event.add('dtend', end_dt)
             else:
@@ -241,12 +244,19 @@ def import_ics_events(
     cal = session.get(Calendar, calendar_id)
     if not cal:
         raise HTTPException(status_code=404, detail="Calendar not found")
-    
+        
     batch_id = str(uuid.uuid4())
     content = file.file.read()
     gcal = ICalCalendar.from_ical(content)
     imported_count = int(0)
     
+    # Determine target user timezone
+    user_tz_str = current_user.timezone or "Europe/London"
+    try:
+        local_tz = ZoneInfo(user_tz_str)
+    except ZoneInfoNotFoundError:
+        local_tz = ZoneInfo("UTC")
+
     for component in gcal.walk():
         if component.name == "VEVENT":
             title = str(component.get('summary', 'Untitled Event'))
@@ -255,12 +265,12 @@ def import_ics_events(
             description = str(component.get('description', ''))
             if not start:
                 continue
-            
+                
             start_dt = start.dt
             if hasattr(start_dt, 'strftime'):
                 if getattr(start_dt, 'tzinfo', None) is not None:
-                    start_dt = start_dt.astimezone().replace(tzinfo=None)
-                
+                    start_dt = start_dt.astimezone(local_tz).replace(tzinfo=None)
+                    
                 date_str = start_dt.strftime("%Y-%m-%d")
                 time_str = start_dt.strftime("%H:%M") if hasattr(start_dt, 'hour') else None
             else:
@@ -272,7 +282,7 @@ def import_ics_events(
                 end_dt = end.dt
                 if hasattr(end_dt, 'strftime') and hasattr(end_dt, 'hour'):
                     if getattr(end_dt, 'tzinfo', None) is not None:
-                        end_dt = end_dt.astimezone().replace(tzinfo=None)
+                        end_dt = end_dt.astimezone(local_tz).replace(tzinfo=None)
                     end_time_str = end_dt.strftime("%H:%M")
                     
             db_event = Event(
@@ -352,7 +362,7 @@ def cleanup_past_events(
     for event in user_events:
         if not event.rrule and event.date < today_str:
             event_links = session.exec(select(EventCalendarLink).where(EventCalendarLink.event_id == event.id)).all()
-            for link in event_links:
+            for link in event_link:
                 session.delete(link)
             session.delete(event)
             deleted_count += 1

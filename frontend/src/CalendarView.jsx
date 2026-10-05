@@ -19,13 +19,10 @@ export default function CalendarView({ events, themeColors, dateFormat, timeForm
     }
   }, [dayStartTime])
 
-  // Updated: Jump to the date AND trigger a visual selection/highlight
   useEffect(() => {
     if (activeRef.current && highlightedDate) {
       const calendarApi = activeRef.current.getApi()
       calendarApi.gotoDate(highlightedDate)
-      
-      // Select the specific date so FullCalendar highlights it visually
       calendarApi.unselect()
       calendarApi.select(highlightedDate)
     }
@@ -67,8 +64,10 @@ export default function CalendarView({ events, themeColors, dateFormat, timeForm
   }
 
   const fcEvents = events.map((evt) => {
-    const startDateTime = evt.start_time ? `${evt.date}T${evt.start_time}` : evt.date
-    const endDateTime = evt.end_time ? `${evt.date}T${evt.end_time}` : undefined
+    // Append 'Z' so FullCalendar knows these are UTC times and converts them via timeZone="local"
+    const startDateTime = evt.start_time ? `${evt.date}T${evt.start_time}Z` : evt.date
+    const endDateTime = evt.end_time ? `${evt.date}T${evt.end_time}Z` : undefined
+    
     const calendarColor = evt.color || '#2196F3'
     const isAllDay = !evt.start_time && !evt.end_time
     const mappedEvent = {
@@ -84,7 +83,7 @@ export default function CalendarView({ events, themeColors, dateFormat, timeForm
       }
     }
     if (evt.rrule) {
-      const cleanDtStart = `${startDateTime.replace(/[-:]/g, '')}${startDateTime.length === 10 ? 'T000000' : ''}`
+      const cleanDtStart = `${startDateTime.replace(/[-:]/g, '').replace('Z', '')}Z`
       let rruleStr = `DTSTART:${cleanDtStart}\nRRULE:${evt.rrule}`
       if (evt.exdates && evt.exdates.length > 0) {
         evt.exdates.forEach((d) => {
@@ -227,6 +226,7 @@ export default function CalendarView({ events, themeColors, dateFormat, timeForm
         ref={activeRef}
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, rrulePlugin]}
         initialView="dayGridMonth"
+        timeZone="local"
         scrollTime={dayStartTime}
         headerToolbar={{
           left: 'prev,next today',
@@ -282,7 +282,7 @@ export default function CalendarView({ events, themeColors, dateFormat, timeForm
           const priority = rawEvent ? rawEvent.priority : 'medium'
           const isAllDay = arg.event.allDay
           const timeStr = rawEvent && rawEvent.start_time ? formatEventTimeStr(rawEvent.start_time.slice(0, 5)) : ''
-          
+                     
           const priorityLabel = priority === 'high' ? 'High' : priority === 'low' ? 'Low' : ''
           const priorityBg = priority === 'high' ? '#d32f2f' : priority === 'low' ? '#388e3c' : ''
           return (
