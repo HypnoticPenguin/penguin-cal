@@ -19,9 +19,9 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Configure Git Identity
         run: |
@@ -32,7 +32,7 @@ jobs:
         id: version-bump
         working-directory: ./frontend
         run: |
-          # Increment patch version (e.g., 0.1.0 -> 0.1.1) using npm[cite: 2]
+          # Increment patch version (e.g., 0.1.0 -> 0.1.1) using npm
           npm version patch --no-git-tag-version
           
           # Extract the new version into an environment variable
@@ -76,7 +76,7 @@ jobs:
           git push origin main --tags
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version-bump.outputs.NEW_VERSION }}
           name: Release v${{ steps.version-bump.outputs.NEW_VERSION }}
@@ -95,7 +95,7 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and Push Backend Docker Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./backend
           file: ./backend/Dockerfile
@@ -105,7 +105,7 @@ jobs:
             mmozzano/penguin-calendar-backend:${{ steps.version-bump.outputs.NEW_VERSION }}
 
       - name: Build and Push Frontend Docker Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./frontend
           platforms: linux/amd64,linux/arm64,linux/arm/v7                     
