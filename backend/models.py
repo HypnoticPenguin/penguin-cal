@@ -11,6 +11,7 @@ class User(SQLModel, table=True):
     date_format: str = Field(default="YYYY-MM-DD")
     time_format: str = Field(default="12h")
     day_start_time: str = Field(default="06:00:00")
+    timezone: str = Field(default="Europe/London")
 
 class Calendar(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

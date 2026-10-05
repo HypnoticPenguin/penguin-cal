@@ -8,6 +8,27 @@ const COLOR_PALETTE = [
   '#9C27B0', '#00BCD4', '#FFEB3B', '#795548', '#607D8B', '#F44336'
 ]
 
+const TIMEZONE_LIST = [
+  'UTC',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Berlin',
+  'Europe/Amsterdam',
+  'Europe/Rome',
+  'Europe/Madrid',
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+  'America/Toronto',
+  'America/Vancouver',
+  'Asia/Tokyo',
+  'Asia/Shanghai',
+  'Asia/Singapore',
+  'Australia/Sydney',
+  'Pacific/Auckland'
+]
+
 export default function DataSettingsModal({
   isOpen,
   onClose,
@@ -17,12 +38,14 @@ export default function DataSettingsModal({
   dateFormat,
   timeFormat,
   dayStartTime,
+  userTimezone = 'Europe/London',
   calendars = [],
   activeCalendarIds = [],
   onThemeChange,
   onDateFormatChange,
   onTimeFormatChange,
   onDayStartTimeChange,
+  onTimezoneChange,
   onEventsChanged,
   onCalendarsChanged,
   onToggleCalendar
@@ -30,11 +53,11 @@ export default function DataSettingsModal({
   const [cleanupMsg, setCleanupMsg] = useState({ text: '', isError: false })
   const [isCleaning, setIsCleaning] = useState(false)
   const [showCleanupConfirm, setShowCleanupConfirm] = useState(false)
+
   const [importCalId, setImportCalId] = useState('')
   const [importFile, setImportFile] = useState(null)
   const [importLoading, setImportLoading] = useState(false)
   const [importMessage, setImportMessage] = useState('')
-  
   const [importBatches, setImportBatches] = useState([])
   const [undoBatchTarget, setUndoBatchTarget] = useState(null)
 
@@ -42,8 +65,8 @@ export default function DataSettingsModal({
   const [newCalName, setNewCalName] = useState('')
   const [newCalColor, setNewCalColor] = useState('#2196F3')
   const [calMsg, setCalMsg] = useState({ text: '', isError: false })
-  const [deleteCalTarget, setDeleteCalTarget] = useState(null)
 
+  const [deleteCalTarget, setDeleteCalTarget] = useState(null)
   const [editingCalId, setEditingCalId] = useState(null)
   const [editCalName, setEditCalName] = useState('')
   const [editCalColor, setEditCalColor] = useState('#2196F3')
@@ -344,11 +367,9 @@ export default function DataSettingsModal({
     const [h, m] = timeStr.split(':')
     const hourNum = parseInt(h, 10)
     if (isNaN(hourNum)) return timeStr
-
     if (timeFormat === '24h') {
       return `${String(hourNum).padStart(2, '0')}:${m}`
     }
-
     if (hourNum === 0 && m === '00') return '12:00 AM (Midnight)'
     const meridiem = hourNum >= 12 ? 'PM' : 'AM'
     const formattedHour = hourNum % 12 === 0 ? 12 : hourNum % 12
@@ -416,6 +437,7 @@ export default function DataSettingsModal({
               {calMsg.text}
             </p>
           )}
+
           {showCreateCal && (
             <form onSubmit={handleCreateCalendar} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '1rem', background: themeColors.bg, padding: '0.75rem', borderRadius: '6px', border: `1px solid ${themeColors.border}` }}>
               <input
@@ -443,6 +465,7 @@ export default function DataSettingsModal({
               </button>
             </form>
           )}
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {calendars.map((cal) => {
               const isVisible = activeCalendarIds.includes(cal.id)
@@ -616,7 +639,7 @@ export default function DataSettingsModal({
               <option value="24h">24-hour (e.g. 15:30)</option>
             </select>
           </div>
-          <div>
+          <div style={{ marginBottom: '0.75rem' }}>
             <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Day/Week View Start Time</label>
             <select
               value={dayStartTime}
@@ -628,6 +651,18 @@ export default function DataSettingsModal({
               <option value="07:00:00">{formatStartTimeOption('07:00:00')}</option>
               <option value="08:00:00">{formatStartTimeOption('08:00:00')}</option>
               <option value="09:00:00">{formatStartTimeOption('09:00:00')}</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Preferred Timezone (for .ics imports)</label>
+            <select
+              value={userTimezone}
+              onChange={(e) => onTimezoneChange(e.target.value)}
+              style={inputStyle}
+            >
+              {TIMEZONE_LIST.map((tz) => (
+                <option key={tz} value={tz}>{tz}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -673,6 +708,7 @@ export default function DataSettingsModal({
                 {importLoading ? 'Importing...' : 'Import Events'}
               </button>
             </form>
+
             <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: `1px dashed ${themeColors.border}` }}>
               <h5 style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem', color: themeColors.subText }}>Recent Imports & Rollbacks</h5>
               {importBatches.length === 0 ? (
@@ -697,7 +733,7 @@ export default function DataSettingsModal({
                       <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         <strong>{batch.filename}</strong> ({batch.event_count} events)<br />
                         <span style={{ fontSize: '0.7rem', color: themeColors.subText }}>
-                          To: {batch.calendar_name}   {batch.imported_at}
+                          To: {batch.calendar_name} • {batch.imported_at}
                         </span>
                       </div>
                       <button

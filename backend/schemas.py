@@ -15,6 +15,7 @@ class UserResponse(BaseModel):
     date_format: str
     time_format: str
     day_start_time: str
+    timezone: str
 
 class ProfileUpdate(BaseModel):
     display_name: Optional[str] = None
@@ -22,6 +23,7 @@ class ProfileUpdate(BaseModel):
     date_format: Optional[str] = None
     time_format: Optional[str] = None
     day_start_time: Optional[str] = None
+    timezone: Optional[str] = None
 
 class CalendarCreate(BaseModel):
     name: str

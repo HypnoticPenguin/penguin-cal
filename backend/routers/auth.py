@@ -4,12 +4,7 @@ from sqlmodel import Session, select
 from database import get_session
 from models import User, Calendar
 from schemas import UserRegister, UserResponse, ProfileUpdate, TokenResponse
-from auth import (
-    hash_password,
-    verify_password,
-    create_access_token,
-    get_current_user
-)
+import auth as auth_utils
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
@@ -27,12 +22,13 @@ def register_user(user_data: UserRegister, session: Session = Depends(get_sessio
     new_user = User(
         username=user_data.username,
         display_name=d_name,
-        hashed_password=hash_password(user_data.password),
+        hashed_password=auth_utils.hash_password(user_data.password),
         is_admin=is_first_user,
         theme="auto",
         date_format="YYYY-MM-DD",
         time_format="12h",
-        day_start_time="06:00:00"
+        day_start_time="06:00:00",
+        timezone="Europe/London"
     )
     session.add(new_user)
     session.commit()
@@ -42,7 +38,7 @@ def register_user(user_data: UserRegister, session: Session = Depends(get_sessio
     session.add(default_cal)
     session.commit()
     
-    token = create_access_token({"sub": new_user.username})
+    token = auth_utils.create_access_token({"sub": new_user.username})
     return {"access_token": token, "token_type": "bearer"}
 
 @router.post("/login", response_model=TokenResponse)
@@ -51,17 +47,17 @@ def login_user(
     session: Session = Depends(get_session)
 ):
     user = session.exec(select(User).where(User.username == form_data.username)).first()
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if not user or not auth_utils.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    token = create_access_token({"sub": user.username})
+    token = auth_utils.create_access_token({"sub": user.username})
     return {"access_token": token, "token_type": "bearer"}
 
 @router.get("/me", response_model=UserResponse)
-def get_me(current_user: User = Depends(get_current_user)):
+def get_me(current_user: User = Depends(auth_utils.get_current_user)):
     return {
         "id": current_user.id,
         "username": current_user.username,
@@ -70,13 +66,14 @@ def get_me(current_user: User = Depends(get_current_user)):
         "theme": current_user.theme or "auto",
         "date_format": current_user.date_format or "YYYY-MM-DD",
         "time_format": current_user.time_format or "12h",
-        "day_start_time": current_user.day_start_time or "06:00:00"
+        "day_start_time": current_user.day_start_time or "06:00:00",
+        "timezone": current_user.timezone or "Europe/London"
     }
 
 @router.put("/profile", response_model=UserResponse)
 def update_profile(
     profile_data: ProfileUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(auth_utils.get_current_user),
     session: Session = Depends(get_session)
 ):
     if profile_data.display_name is not None:
@@ -90,12 +87,12 @@ def update_profile(
         
     if profile_data.date_format is not None:
         current_user.date_format = profile_data.date_format
-
     if profile_data.time_format is not None:
         current_user.time_format = profile_data.time_format
-
     if profile_data.day_start_time is not None:
         current_user.day_start_time = profile_data.day_start_time
+    if profile_data.timezone is not None:
+        current_user.timezone = profile_data.timezone
         
     session.add(current_user)
     session.commit()
@@ -109,25 +106,26 @@ def update_profile(
         "theme": current_user.theme,
         "date_format": current_user.date_format,
         "time_format": current_user.time_format,
-        "day_start_time": current_user.day_start_time
+        "day_start_time": current_user.day_start_time,
+        "timezone": current_user.timezone
     }
 
 @router.put("/change-password")
 def change_password(
     password_data: dict,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(auth_utils.get_current_user),
     session: Session = Depends(get_session)
 ):
     curr_pw = password_data.get("current_password")
     new_pw = password_data.get("new_password")
     
-    if not verify_password(curr_pw, current_user.hashed_password):
+    if not auth_utils.verify_password(curr_pw, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect current password")
         
     if not new_pw or len(new_pw) < 4:
         raise HTTPException(status_code=400, detail="New password must be at least 4 characters long")
         
-    current_user.hashed_password = hash_password(new_pw)
+    current_user.hashed_password = auth_utils.hash_password(new_pw)
     session.add(current_user)
     session.commit()
     return {"message": "Password updated successfully"}

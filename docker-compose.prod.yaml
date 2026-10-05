@@ -1,8 +1,6 @@
 services:
   backend:
     image: mmozzano/penguin-calendar-backend:latest
-    environment:
-      - TZ=Europe/London
     container_name: ${SERVICE:-penguin}-backend
     restart: unless-stopped
     init: true
