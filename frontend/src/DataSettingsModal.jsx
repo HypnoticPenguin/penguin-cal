@@ -53,24 +53,20 @@ export default function DataSettingsModal({
   const [cleanupMsg, setCleanupMsg] = useState({ text: '', isError: false })
   const [isCleaning, setIsCleaning] = useState(false)
   const [showCleanupConfirm, setShowCleanupConfirm] = useState(false)
-
   const [importCalId, setImportCalId] = useState('')
   const [importFile, setImportFile] = useState(null)
   const [importLoading, setImportLoading] = useState(false)
   const [importMessage, setImportMessage] = useState('')
   const [importBatches, setImportBatches] = useState([])
   const [undoBatchTarget, setUndoBatchTarget] = useState(null)
-
   const [showCreateCal, setShowCreateCal] = useState(false)
   const [newCalName, setNewCalName] = useState('')
   const [newCalColor, setNewCalColor] = useState('#2196F3')
   const [calMsg, setCalMsg] = useState({ text: '', isError: false })
-
   const [deleteCalTarget, setDeleteCalTarget] = useState(null)
   const [editingCalId, setEditingCalId] = useState(null)
   const [editCalName, setEditCalName] = useState('')
   const [editCalColor, setEditCalColor] = useState('#2196F3')
-
   const [shareUsers, setShareUsers] = useState([])
   const [selectedShareCalId, setSelectedShareCalId] = useState(null)
 
@@ -417,7 +413,7 @@ export default function DataSettingsModal({
         }}
       >
         <h2 style={{ marginTop: 0, marginBottom: '1.25rem' }}>Calendar & App Settings</h2>
-
+        
         <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${themeColors.border}` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
             <h3 style={{ margin: 0 }}>Calendar Management & Visibility</h3>
@@ -437,7 +433,6 @@ export default function DataSettingsModal({
               {calMsg.text}
             </p>
           )}
-
           {showCreateCal && (
             <form onSubmit={handleCreateCalendar} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '1rem', background: themeColors.bg, padding: '0.75rem', borderRadius: '6px', border: `1px solid ${themeColors.border}` }}>
               <input
@@ -465,7 +460,6 @@ export default function DataSettingsModal({
               </button>
             </form>
           )}
-
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {calendars.map((cal) => {
               const isVisible = activeCalendarIds.includes(cal.id)
@@ -639,7 +633,7 @@ export default function DataSettingsModal({
               <option value="24h">24-hour (e.g. 15:30)</option>
             </select>
           </div>
-          <div style={{ marginBottom: '0.75rem' }}>
+          <div>
             <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Day/Week View Start Time</label>
             <select
               value={dayStartTime}
@@ -651,18 +645,6 @@ export default function DataSettingsModal({
               <option value="07:00:00">{formatStartTimeOption('07:00:00')}</option>
               <option value="08:00:00">{formatStartTimeOption('08:00:00')}</option>
               <option value="09:00:00">{formatStartTimeOption('09:00:00')}</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Preferred Timezone (for .ics imports)</label>
-            <select
-              value={userTimezone}
-              onChange={(e) => onTimezoneChange(e.target.value)}
-              style={inputStyle}
-            >
-              {TIMEZONE_LIST.map((tz) => (
-                <option key={tz} value={tz}>{tz}</option>
-              ))}
             </select>
           </div>
         </div>
@@ -700,6 +682,18 @@ export default function DataSettingsModal({
                   ))}
                 </select>
               </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.80rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Preferred Timezone (for .ics imports)</label>
+                <select
+                  value={userTimezone}
+                  onChange={(e) => onTimezoneChange(e.target.value)}
+                  style={inputStyle}
+                >
+                  {TIMEZONE_LIST.map((tz) => (
+                    <option key={tz} value={tz}>{tz}</option>
+                  ))}
+                </select>
+              </div>
               <button
                 type="submit"
                 disabled={importLoading}
@@ -708,7 +702,6 @@ export default function DataSettingsModal({
                 {importLoading ? 'Importing...' : 'Import Events'}
               </button>
             </form>
-
             <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: `1px dashed ${themeColors.border}` }}>
               <h5 style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem', color: themeColors.subText }}>Recent Imports & Rollbacks</h5>
               {importBatches.length === 0 ? (
