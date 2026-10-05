@@ -72,7 +72,6 @@ To run the production setup configured with Traefik routing and Homepage label i
 1. Create a `.env` file in the root directory based on the following template:
 
 
-
 ```env
 DOMAIN=yourdomain.com
 SERVICE=calendar
