@@ -362,7 +362,7 @@ def cleanup_past_events(
     for event in user_events:
         if not event.rrule and event.date < today_str:
             event_links = session.exec(select(EventCalendarLink).where(EventCalendarLink.event_id == event.id)).all()
-            for link in event_link:
+            for link in event_links:
                 session.delete(link)
             session.delete(event)
             deleted_count += 1
